@@ -14,7 +14,7 @@
         if (!input || !display || !row || !input.addEventListener || !("textContent" in display)) { return; }
         var button = document.createElement("button");
         button.type = "button";
-        button.className = "text-button caption-toggle";
+        button.className = "caption-toggle";
         button.setAttribute("aria-controls", editor.id);
         var expanded = !!document.querySelector(".error");
 

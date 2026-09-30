@@ -19,7 +19,7 @@
     <div class="section-label"><span class="step">01</span> PHOTOS</div>
     {{if .Asset.Photos}}<div class="existing-photos">
       {{range $index, $photo := .Asset.Photos}}<div class="existing-photo captioned-photo">
-        <label>{{if eq $index 0}}Overview photo <span class="required">Required</span>{{else}}Detail photo <span class="optional">Optional</span>{{end}}</label>
+        <label>{{if eq $index 0}}Overview photo{{else}}Detail photo{{end}}</label>
         <a href="/{{.Path}}" target="_blank" rel="noopener noreferrer"><img src="/{{.Thumbnail}}" alt="{{if .Caption}}{{.Caption}}{{else}}{{.Name}}{{end}}"></a>
         <label class="overview-choice" for="overview-choice-{{$index}}"><input type="radio" id="overview-choice-{{$index}}" name="overview_choice" value="{{.Path}}" {{if eq $index 0}}checked{{end}}> Use as overview</label>
         <div class="photo-caption"><span class="caption-display">{{.Caption}}</span> <a href="/{{.Path}}" target="_blank" rel="noopener noreferrer">Open full image</a></div>

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Simplify existing photo headings and match caption controls to full-image links.
+
 ## 0.5.0 - 2026-09-30
 
 - Mark an existing or newly selected photo as overview, moving it first while
