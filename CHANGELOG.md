@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Arrange attached photos before saving with move controls, or numbered positions
+  in plain HTML. The first photo becomes overview; captions and intake are preserved.
+- Remove the redundant overview selection controls; saved photo order determines
+  the overview.
+
 - Simplify existing photo headings and match caption controls to full-image links.
 
 ## 0.5.0 - 2026-09-30

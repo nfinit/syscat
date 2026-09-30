@@ -17,11 +17,11 @@
   <input type="hidden" name="revision" value="{{.Asset.Revision}}">
   <div class="photo-section">
     <div class="section-label"><span class="step">01</span> PHOTOS</div>
-    {{if .Asset.Photos}}<div class="existing-photos">
+    {{if .Asset.Photos}}<noscript><small>Use each position number once. Position 1 is the overview.</small></noscript><div class="existing-photos">
       {{range $index, $photo := .Asset.Photos}}<div class="existing-photo captioned-photo">
-        <label>{{if eq $index 0}}Overview photo{{else}}Detail photo{{end}}</label>
+        <label class="photo-heading">{{if eq $index 0}}Overview photo{{else}}Detail photo{{end}}</label>
+        <div class="photo-position"><label for="photo-position-{{$index}}">Position</label><input type="number" id="photo-position-{{$index}}" name="position_{{.Path}}" value="{{inc $index}}" min="1" max="{{len $.Asset.Photos}}" required></div>
         <a href="/{{.Path}}" target="_blank" rel="noopener noreferrer"><img src="/{{.Thumbnail}}" alt="{{if .Caption}}{{.Caption}}{{else}}{{.Name}}{{end}}"></a>
-        <label class="overview-choice" for="overview-choice-{{$index}}"><input type="radio" id="overview-choice-{{$index}}" name="overview_choice" value="{{.Path}}" {{if eq $index 0}}checked{{end}}> Use as overview</label>
         <div class="photo-caption"><span class="caption-display">{{.Caption}}</span> <a href="/{{.Path}}" target="_blank" rel="noopener noreferrer">Open full image</a></div>
         <div class="caption-editor" id="caption-editor-{{$index}}">
           <label for="caption-{{$index}}">Caption <span class="optional">Optional</span></label>

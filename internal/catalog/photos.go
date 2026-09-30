@@ -158,47 +158,34 @@ func saveUploads(dir string, form *multipart.Form, requireOverview bool) ([]Phot
 	return photos, nil
 }
 
-// Existing photos use their stored path as identity. Uploads use their index in
-// the overview-first upload batch, before permanent filenames are allocated.
-func overviewSelection(values map[string][]string, photos []Photo, uploadCount int) (int, error) {
-	choices := values["overview_choice"]
-	if len(choices) == 0 {
-		return 0, nil
-	}
-	if len(choices) != 1 {
-		return 0, errors.New("choose one overview photo")
-	}
-	choice := choices[0]
-	if strings.HasPrefix(choice, "upload:") {
-		raw := strings.TrimPrefix(choice, "upload:")
-		index, err := strconv.Atoi(raw)
-		if err != nil || strconv.Itoa(index) != raw || index < 0 || index >= uploadCount {
-			return 0, errors.New("the selected overview upload is no longer attached; reselect the photo")
-		}
-		return len(photos) + index, nil
-	}
-	for i, photo := range photos {
-		if photo.Path == choice {
-			return i, nil
+// Positions must describe every attached photo exactly once. Work on a copy so
+// invalid input cannot partially reorder the form or the stored record.
+func submittedPhotoOrder(values map[string][]string, photos []Photo) error {
+	present := false
+	for _, photo := range photos {
+		if _, ok := values["position_"+photo.Path]; ok {
+			present = true
 		}
 	}
-	return 0, errors.New("the selected overview photo is not attached to this entry")
-}
-
-func uploadCount(form *multipart.Form) int {
-	if form == nil {
-		return 0
+	if !present {
+		return nil
 	}
-	return len(form.File["overview"]) + len(form.File["photos"])
-}
-
-func promoteOverview(photos []Photo, index int) {
-	if len(photos) == 0 || index == 0 {
-		return
+	ordered := make([]Photo, len(photos))
+	used := make([]bool, len(photos))
+	for _, photo := range photos {
+		positions := values["position_"+photo.Path]
+		if len(positions) != 1 {
+			return errors.New("assign one position to every attached photo")
+		}
+		position, err := strconv.Atoi(positions[0])
+		if err != nil || position < 1 || position > len(photos) || used[position-1] {
+			return fmt.Errorf("photo positions must use each number from 1 to %d once", len(photos))
+		}
+		used[position-1] = true
+		ordered[position-1] = photo
 	}
-	photo := photos[index]
-	copy(photos[1:index+1], photos[:index])
-	photos[0] = photo
+	copy(photos, ordered)
+	return nil
 }
 
 func removePhotos(dir string, photos []Photo) {
