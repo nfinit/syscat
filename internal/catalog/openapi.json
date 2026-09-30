@@ -12,6 +12,25 @@
   ],
   "security": [],
   "paths": {
+    "/api": {
+      "get": {
+        "operationId": "getAPIIndex",
+        "summary": "Discover the API",
+        "description": "API index with links to the inventory and OpenAPI description. /api/ is an alias.",
+        "responses": {
+          "200": {
+            "description": "API discovery index",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIIndex"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/assets": {
       "get": {
         "operationId": "listAssets",
@@ -447,6 +466,54 @@
               },
               "message": {
                 "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "APIIndex": {
+        "type": "object",
+        "required": [
+          "name",
+          "build",
+          "read_only",
+          "links"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": [
+              "Syscat"
+            ]
+          },
+          "build": {
+            "type": "string"
+          },
+          "read_only": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "links": {
+            "type": "object",
+            "required": [
+              "self",
+              "assets",
+              "openapi"
+            ],
+            "properties": {
+              "self": {
+                "type": "string",
+                "format": "uri-reference"
+              },
+              "assets": {
+                "type": "string",
+                "format": "uri-reference"
+              },
+              "openapi": {
+                "type": "string",
+                "format": "uri-reference"
               }
             }
           }

@@ -26,7 +26,7 @@
     {{if eq .Page "list"}}{{template "list" .}}{{end}}
     {{if eq .Page "detail"}}{{template "detail" .}}{{end}}
   </main>
-  <footer class="site-footer"><span>{{.Build}}</span></footer>
+  <footer class="site-footer"><span>{{.Build}}</span><a href="/api">API</a></footer>
   {{if or (eq .Page "form") (and (eq .Page "detail") (not .Asset.Archived))}}<script src="/static/existing-values.js" defer></script><script src="/static/photo-previews.js" defer></script>{{end}}
 </body>
 </html>{{end}}

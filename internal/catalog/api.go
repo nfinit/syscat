@@ -11,6 +11,8 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+
+	"syscat/internal/buildinfo"
 )
 
 //go:embed openapi.json
@@ -199,6 +201,19 @@ func (a *App) apiDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	apiJSON(w, http.StatusOK, asAPIAsset(entry))
+}
+
+func (a *App) apiIndex(w http.ResponseWriter, r *http.Request) {
+	apiJSON(w, http.StatusOK, map[string]any{
+		"name":      "Syscat",
+		"build":     buildinfo.String(),
+		"read_only": true,
+		"links": map[string]string{
+			"self":    "/api",
+			"assets":  "/api/assets",
+			"openapi": "/api/openapi.json",
+		},
+	})
 }
 
 func (a *App) apiSpec(w http.ResponseWriter, r *http.Request) {

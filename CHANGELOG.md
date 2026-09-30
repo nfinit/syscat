@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.3.1 - 2026-09-30
+
+- Make the API discoverable with a JSON index at `/api` and `/api/`, an API link
+  in the site footer, and a `service-desc` Link header pointing to OpenAPI.
+
 ## 0.3.0 - 2026-09-30
 
 - Add a read-only JSON API for paginated inventory search and individual records,

@@ -104,7 +104,10 @@ func NewWithUploadLimit(dir string, maxUploadMiB int64) (*App, error) {
 	mux.HandleFunc("GET /api/openapi.json", a.apiSpec)
 	mux.HandleFunc("/api/openapi.json", a.apiMethodNotAllowed)
 	mux.HandleFunc("/api/", a.apiNotFound)
-	mux.HandleFunc("/api", a.apiNotFound)
+	mux.HandleFunc("GET /api", a.apiIndex)
+	mux.HandleFunc("/api", a.apiMethodNotAllowed)
+	mux.HandleFunc("GET /api/{$}", a.apiIndex)
+	mux.HandleFunc("/api/{$}", a.apiMethodNotAllowed)
 	mux.HandleFunc("GET /photos/{name}", a.photo)
 	mux.HandleFunc("GET /thumbnails/{name}", a.photo)
 	static, _ := fs.Sub(assets, "static")
@@ -120,6 +123,7 @@ func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Referrer-Policy", "same-origin")
 	w.Header().Set("Content-Security-Policy", "default-src 'self'; img-src 'self' blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
 	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Link", `</api/openapi.json>; rel="service-desc"; type="application/json"`)
 	a.handler.ServeHTTP(w, r)
 }
 

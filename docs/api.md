@@ -6,6 +6,7 @@ it is accessible to anyone who can reach this trusted-network server.
 
 | Endpoint | Purpose |
 | --- | --- |
+| `GET /api` | API discovery index (`/api/` is also supported) |
 | `GET /api/assets` | Paginated listing and search |
 | `GET /api/assets/{id}` | Full current record and original intake |
 | `GET /api/openapi.json` | Embedded OpenAPI 3.0.3 description |
@@ -14,6 +15,26 @@ GET and HEAD are supported. Other methods on API endpoints return HTTP 405 with
 `Allow: GET, HEAD`. Unknown API endpoints return HTTP 404. API responses and
 errors are JSON with `Cache-Control: no-store`. API calls do not create sessions.
 There are no API write endpoints.
+
+## Discovery
+
+Starting from the server address, clients can discover the API through the
+`Link` response header on pages, redirects, API responses, and errors:
+
+```http
+Link: </api/openapi.json>; rel="service-desc"; type="application/json"
+```
+
+The `service-desc` relation identifies a machine-readable service description
+([RFC 8631](https://www.rfc-editor.org/rfc/rfc8631)). The site footer also links
+to `/api`. Both `/api` and `/api/` return a JSON index with `name`, `build`,
+`read_only`, and a `links` object pointing to `self`, `assets`, and `openapi`.
+All links are root-relative and work without cookies.
+
+```sh
+curl -I http://127.0.0.1:8800/
+curl http://127.0.0.1:8800/api
+```
 
 ## Listing and search
 

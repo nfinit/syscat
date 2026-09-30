@@ -170,7 +170,6 @@ func TestAPIRejectsInvalidRequestsAndWrites(t *testing.T) {
 		{"/api/assets/9223372036854775808", 400, "invalid_id"},
 		{"/api/assets/999", 404, "not_found"},
 		{"/api/unknown", 404, "not_found"},
-		{"/api", 404, "not_found"},
 	}
 	for _, tc := range cases {
 		result := b.get(tc.path)
@@ -182,7 +181,7 @@ func TestAPIRejectsInvalidRequestsAndWrites(t *testing.T) {
 		}
 	}
 	for _, method := range []string{"POST", "PUT", "PATCH", "DELETE", "OPTIONS"} {
-		for _, path := range []string{"/api/assets", "/api/assets/1", "/api/openapi.json"} {
+		for _, path := range []string{"/api", "/api/", "/api/assets", "/api/assets/1", "/api/openapi.json"} {
 			result := b.request(method, path, "application/json", strings.NewReader(`{"description":"Overwrite attempt"}`))
 			expect(t, result, http.StatusMethodNotAllowed)
 			var response apiErrorResponse
@@ -247,16 +246,61 @@ func TestAPIPaginationLinksAndSpec(t *testing.T) {
 	if spec.OpenAPI != "3.0.3" {
 		t.Fatal("incorrect OpenAPI version")
 	}
-	for _, path := range []string{"/api/assets", "/api/assets/{id}", "/api/openapi.json", "/photos/{name}", "/thumbnails/{name}"} {
+	for _, path := range []string{"/api", "/api/assets", "/api/assets/{id}", "/api/openapi.json", "/photos/{name}", "/thumbnails/{name}"} {
 		if _, ok := spec.Paths[path]; !ok {
 			t.Fatalf("spec missing path %s", path)
 		}
 	}
-	for _, path := range []string{"/api/assets", "/api/assets/1", "/api/openapi.json"} {
+	for _, path := range []string{"/api", "/api/", "/api/assets", "/api/assets/1", "/api/openapi.json"} {
 		result := b.request("HEAD", path, "", nil)
 		expect(t, result, 200)
 		if result.Header().Get("Content-Type") != "application/json; charset=utf-8" {
 			t.Fatal("HEAD content type incorrect")
 		}
+	}
+}
+
+func TestAPIDiscoveryFromHomePage(t *testing.T) {
+	app, b, _ := start(t)
+	const expectedLink = `</api/openapi.json>; rel="service-desc"; type="application/json"`
+	root := b.get("/")
+	expect(t, root, http.StatusSeeOther)
+	if root.Header().Get("Link") != expectedLink {
+		t.Fatal("root redirect does not advertise OpenAPI")
+	}
+	form := b.get(root.Header().Get("Location"))
+	expect(t, form, 200)
+	if form.Header().Get("Link") != expectedLink || !strings.Contains(form.Body.String(), `<a href="/api">API</a>`) {
+		t.Fatal("HTML page missing discovery header or footer link")
+	}
+	b.cookie = nil
+	sessions := len(app.sessions)
+	for _, path := range []string{"/api", "/api/"} {
+		result := b.get(path)
+		expect(t, result, 200)
+		var index struct {
+			Name     string            `json:"name"`
+			Build    string            `json:"build"`
+			ReadOnly bool              `json:"read_only"`
+			Links    map[string]string `json:"links"`
+		}
+		readAPI(t, result, &index)
+		if index.Name != "Syscat" || index.Build == "" || !index.ReadOnly || index.Links["self"] != "/api" || index.Links["assets"] != "/api/assets" || index.Links["openapi"] != "/api/openapi.json" {
+			t.Fatalf("invalid API index: %+v", index)
+		}
+		if result.Header().Get("Link") != expectedLink {
+			t.Fatal("API index missing discovery header")
+		}
+		for _, target := range index.Links {
+			expect(t, b.get(target), 200)
+		}
+	}
+	result := b.get("/api/nonexistent")
+	expect(t, result, 404)
+	if result.Header().Get("Link") != expectedLink {
+		t.Fatal("API errors missing discovery header")
+	}
+	if len(app.sessions) != sessions {
+		t.Fatal("API discovery created a session")
 	}
 }

@@ -133,7 +133,9 @@ curl 'http://127.0.0.1:8800/api/assets?q=00001&page_size=10'
 ```
 
 See [API documentation](docs/api.md). The embedded OpenAPI description is served
-at `/api/openapi.json`. The API shares the catalog's network access model.
+at `/api/openapi.json`. The footer links to `/api`, a JSON discovery index, and
+response headers advertise the OpenAPI document. The API shares the catalog's
+network access model.
 
 ## Development
 
