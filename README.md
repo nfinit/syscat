@@ -49,7 +49,10 @@ resulting executable needs neither Go nor an installed SQLite.
 
 ## Intake
 
-- One entry per physical system. All fields and photos are optional.
+- One entry per physical system. An overview photo and description are required;
+  location and detail photos are optional. Existing photos satisfy the overview
+  requirement when editing. Older entries without photos need an overview before
+  saving changes.
 - Permanent inventory IDs have no prefix: `00001`, `00002`, and so on. Numbers
   are never reused; padding is for display and grows beyond five digits.
 - Enter location and one detailed description. Start the description with a
@@ -72,7 +75,7 @@ resulting executable needs neither Go nor an installed SQLite.
 
 ## Photos
 
-Intake offers an overview photo and detail photos. The first attached image is
+Intake requires one overview photo and offers optional detail photos. The first attached image is
 used in the collection. Supporting browsers can select multiple detail files,
 add more file inputs, and show local previews before saving. Without JavaScript,
 ordinary uploads work; browsers without multiple selection can attach additional

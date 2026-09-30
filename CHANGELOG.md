@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+## 0.2.0 - 2026-09-30
+
+- Require an overview photo and description on intake and edit forms. Existing
+  photos satisfy the overview requirement; location and detail photos stay optional.
+  Server validation enforces the requirements without JavaScript or browser validation.
+- Simplify the application header by removing the S icon before the Syscat title.
+- Remove redundant description and collection-photo guidance from entry forms.
+
+Breaking intake change: saves now reject missing overview photos or blank
+descriptions, which were previously accepted. Older entries remain readable;
+entries without photos must attach an overview before saving edits. Original
+intake is preserved. New overview uploads use the `overview` form field;
+`photos` holds optional detail uploads.
+
+No SQLite schema or export format changes.
+
 ## 0.1.1 - 2026-09-30
 
 - Raise the default total upload request limit from 32 to 256 MiB and add

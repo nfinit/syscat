@@ -83,12 +83,20 @@ func savePhoto(dir string, header *multipart.FileHeader) (Photo, error) {
 	return p, nil
 }
 
-func saveUploads(dir string, form *multipart.Form) ([]Photo, error) {
+func saveUploads(dir string, form *multipart.Form, requireOverview bool) ([]Photo, error) {
 	photos := []Photo{}
-	if form == nil {
-		return photos, nil
+	var overview, details []*multipart.FileHeader
+	if form != nil {
+		overview, details = form.File["overview"], form.File["photos"]
 	}
-	files := form.File["photos"]
+	if requireOverview && len(overview) == 0 {
+		return nil, errors.New("an overview photo is required")
+	}
+	if len(overview) > 1 {
+		return nil, errors.New("select one overview photo")
+	}
+	// Keep the overview first, regardless of multipart field order.
+	files := append(overview, details...)
 	for _, header := range files {
 		p, err := savePhoto(dir, header)
 		if err != nil {

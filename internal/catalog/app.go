@@ -221,6 +221,9 @@ func submitted(r *http.Request) Asset {
 }
 
 func validate(c Asset) error {
+	if strings.TrimSpace(c.Description) == "" {
+		return errors.New("a description is required")
+	}
 	if len(c.Description) > 20000 || len(c.Location) > 500 {
 		return errors.New("field limits: description 20,000 bytes; location 500")
 	}
@@ -264,7 +267,7 @@ func (a *App) create(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, err)
 		return
 	}
-	photos, err := saveUploads(a.dir, r.MultipartForm)
+	photos, err := saveUploads(a.dir, r.MultipartForm, true)
 	if err != nil {
 		p.Error = err.Error() + ". Entered text retained. Reselect photo files before submitting."
 		a.form(w, http.StatusBadRequest, p)
@@ -369,7 +372,7 @@ func (a *App) update(w http.ResponseWriter, r *http.Request) {
 		a.form(w, http.StatusConflict, p)
 		return
 	}
-	photos, err := saveUploads(a.dir, r.MultipartForm)
+	photos, err := saveUploads(a.dir, r.MultipartForm, len(latest.Photos) == 0)
 	if err != nil {
 		p.Error = err.Error() + ". Entered text retained. Reselect photo files before submitting."
 		a.form(w, http.StatusBadRequest, p)

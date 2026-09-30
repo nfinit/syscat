@@ -12,7 +12,6 @@ button { cursor: pointer; }
 .site-header { background: #fffefa; border-bottom: 1px solid #dedfd5; }
 .header-inner { max-width: 1180px; margin: 0 auto; padding: 23px 36px; }
 .brand { display: inline-block; vertical-align: middle; text-decoration: none; font-size: 27px; font-weight: 750; letter-spacing: -1.3px; line-height: 1; }
-.brand-mark { display: inline-block; margin-right: 9px; padding: 6px 8px 9px; border-radius: 5px; background: #245b4d; color: #fffced; font-size: 26px; }
 .brand-caption { display: inline-block; margin-left: 24px; vertical-align: middle; color: #748078; letter-spacing: 1.6px; font-size: 9px; font-weight: 600; }
 .header-inner nav { float: right; padding-top: 8px; }
 nav a { display: inline-block; text-decoration: none; margin-left: 8px; padding: 5px 13px; border-radius: 4px; font-size: 14px; }
@@ -30,6 +29,7 @@ h2 { line-height: 1.3; }
 .section-aside { float: right; letter-spacing: 0; color: #8a9084; font-weight: normal; font-size: 11px; }
 .field { margin-bottom: 20px; }
 label { display: block; font-size: 13px; font-weight: 600; margin: 0 0 7px; }
+.required { font-size: 11px; font-weight: normal; margin-left: 7px; }
 .optional { font-size: 11px; font-weight: normal; color: #929589; margin-left: 7px; }
 input[type="text"], input[type="search"], textarea { width: 100%; background: #fff; border: 1px solid #d4dacd; border-radius: 4px; color: #263a35; padding: 11px 12px; line-height: 1.4; }
 input::placeholder, textarea::placeholder { color: #969d92; opacity: 1; }
@@ -139,7 +139,6 @@ summary { cursor: pointer; color: #617756; padding: 4px 0; }
 @media (max-width: 720px) {
  .header-inner { padding: 18px 20px; }
  .brand { font-size: 23px; }
- .brand-mark { font-size: 20px; padding: 5px 6px 7px; }
  .header-inner nav { padding-top: 1px; }
  nav a { font-size: 12px; padding: 7px 8px; margin-left: 0; }
  .shell { padding: 30px 20px 35px; }
@@ -157,7 +156,6 @@ summary { cursor: pointer; color: #617756; padding: 4px 0; }
 @media (max-width: 420px) {
  .header-inner { padding: 16px; }
  .brand { font-size: 21px; }
- .brand-mark { margin-right: 5px; }
  nav a { font-size: 11px; padding: 7px 6px; }
  .shell { padding-left: 14px; padding-right: 14px; }
  .entry-form { padding-left: 19px; padding-right: 19px; }
