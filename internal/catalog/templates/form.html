@@ -17,7 +17,17 @@
   <input type="hidden" name="revision" value="{{.Asset.Revision}}">
   <div class="photo-section">
     <div class="section-label"><span class="step">01</span> PHOTOS</div>
-    {{if .Asset.Photos}}<div class="existing-photos">{{range $index, $photo := .Asset.Photos}}<div class="existing-photo"><label>{{if eq $index 0}}Overview photo <span class="required">Required</span>{{else}}Detail photo <span class="optional">Optional</span>{{end}}</label><a href="/{{.Path}}" target="_blank" rel="noopener noreferrer"><img src="/{{.Thumbnail}}" alt="{{.Name}}"></a><a href="/{{.Path}}" target="_blank" rel="noopener noreferrer">Open full image</a></div>{{end}}</div>{{end}}
+    {{if .Asset.Photos}}<div class="existing-photos">
+      {{range $index, $photo := .Asset.Photos}}<div class="existing-photo captioned-photo">
+        <label>{{if eq $index 0}}Overview photo <span class="required">Required</span>{{else}}Detail photo <span class="optional">Optional</span>{{end}}</label>
+        <a href="/{{.Path}}" target="_blank" rel="noopener noreferrer"><img src="/{{.Thumbnail}}" alt="{{if .Caption}}{{.Caption}}{{else}}{{.Name}}{{end}}"></a>
+        <div class="photo-caption"><span class="caption-display">{{.Caption}}</span> <a href="/{{.Path}}" target="_blank" rel="noopener noreferrer">Open full image</a></div>
+        <div class="caption-editor" id="caption-editor-{{$index}}">
+          <label for="caption-{{$index}}">Caption <span class="optional">Optional</span></label>
+          <input type="text" id="caption-{{$index}}" name="caption_{{.Path}}" value="{{.Caption}}" maxlength="1000">
+        </div>
+      </div>{{end}}
+    </div>{{end}}
     <div class="photo-inputs">
       {{if not .Asset.Photos}}<div class="field"><label for="photo-overview">Overview photo <span class="required">Required</span></label><input type="file" id="photo-overview" name="overview" required accept="image/jpeg,image/png,image/gif"></div>{{end}}
       <div class="field"><label for="photo-details">{{if .Asset.Photos}}Add detail or followup photos{{else}}Detail photos{{end}} <span class="optional">Optional</span></label><input type="file" id="photo-details" name="photos" accept="image/jpeg,image/png,image/gif" multiple></div>

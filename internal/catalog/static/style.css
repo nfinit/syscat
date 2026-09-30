@@ -121,7 +121,6 @@ figcaption a { display: inline-block; margin-left: 10px; }
 .photo-placeholder p { font-size: 13px; max-width: 300px; margin: 12px auto 20px; }
 .existing-photo { margin-bottom: 18px; }
 .existing-photo a { display: block; }
-.existing-photo a + a { font-size: 12px; margin-top: 6px; }
 .existing-photos img { display: block; width: 100%; height: auto; border-radius: 4px; }
 .original-intake { margin-top: 25px; padding: 20px 26px; font-size: 13px; }
 summary { cursor: pointer; color: #617756; padding: 4px 0; }
@@ -168,3 +167,10 @@ summary { cursor: pointer; color: #617756; padding: 4px 0; }
 }
 
 .add-photo { display: none; margin-bottom: 10px; }
+
+.caption-editor label { margin-top: 12px; }
+.photo-preview .captioned-photo { margin-bottom: 20px; }
+.photo-caption { margin-top: 8px; font-size: 12px; overflow-wrap: break-word; }
+.photo-caption a { display: inline-block; margin-right: 12px; }
+.caption-display:not(:empty) { margin-right: 12px; }
+.caption-toggle { min-height: 36px; }

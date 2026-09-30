@@ -10,6 +10,8 @@ import (
 	"mime/multipart"
 	"os"
 	"path/filepath"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/disintegration/imaging"
 )
@@ -83,6 +85,33 @@ func savePhoto(dir string, header *multipart.FileHeader) (Photo, error) {
 	return p, nil
 }
 
+const maxCaptionLength = 1000
+
+func validateCaption(caption string) error {
+	if utf8.RuneCountInString(caption) > maxCaptionLength {
+		return errors.New("photo captions must be 1,000 characters or fewer")
+	}
+	return nil
+}
+
+// Only update fields actually submitted, so older clients preserve captions.
+func submittedCaptions(rValues map[string][]string, photos []Photo) error {
+	for i := range photos {
+		if values, ok := rValues["caption_"+photos[i].Path]; ok {
+			if len(values) != 1 {
+				return errors.New("submit one caption per photo")
+			}
+			photos[i].Caption = strings.TrimSpace(values[0])
+		}
+	}
+	for _, photo := range photos {
+		if err := validateCaption(photo.Caption); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func saveUploads(dir string, form *multipart.Form, requireOverview bool) ([]Photo, error) {
 	photos := []Photo{}
 	var overview, details []*multipart.FileHeader
@@ -95,14 +124,34 @@ func saveUploads(dir string, form *multipart.Form, requireOverview bool) ([]Phot
 	if len(overview) > 1 {
 		return nil, errors.New("select one overview photo")
 	}
+	captions := make([]string, len(overview)+len(details))
+	if form != nil {
+		for _, field := range []string{"overview", "photos"} {
+			values := form.Value["caption_"+field]
+			count, offset := len(overview), 0
+			if field == "photos" {
+				count, offset = len(details), len(overview)
+			}
+			if len(values) != 0 && len(values) != count {
+				return nil, errors.New("photo captions do not match the selected files")
+			}
+			for i, value := range values {
+				captions[offset+i] = strings.TrimSpace(value)
+				if err := validateCaption(captions[offset+i]); err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
 	// Keep the overview first, regardless of multipart field order.
 	files := append(overview, details...)
-	for _, header := range files {
+	for i, header := range files {
 		p, err := savePhoto(dir, header)
 		if err != nil {
 			removePhotos(dir, photos)
 			return nil, fmt.Errorf("%s: %w", header.Filename, err)
 		}
+		p.Caption = captions[i]
 		photos = append(photos, p)
 	}
 	return photos, nil

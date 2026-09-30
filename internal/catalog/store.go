@@ -24,6 +24,7 @@ type Photo struct {
 	Path      string `json:"path"`
 	Thumbnail string `json:"thumbnail"`
 	Name      string `json:"original_name"`
+	Caption   string `json:"caption,omitempty"`
 }
 
 type Asset struct {

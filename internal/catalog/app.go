@@ -360,7 +360,10 @@ func (a *App) update(w http.ResponseWriter, r *http.Request) {
 	err := a.parsePost(w, r, s)
 	defer cleanupForm(r)
 	c := submitted(r)
-	c.ID, c.Photos = current.ID, current.Photos
+	c.ID, c.Photos = current.ID, append([]Photo(nil), current.Photos...)
+	if err == nil {
+		err = submittedCaptions(r.PostForm, c.Photos)
+	}
 	p := page{Page: "form", Title: "Edit entry " + c.Label(), Asset: c, CSRF: s.CSRF}
 	if err != nil {
 		p.Error = err.Error()
@@ -390,7 +393,7 @@ func (a *App) update(w http.ResponseWriter, r *http.Request) {
 		a.form(w, http.StatusBadRequest, p)
 		return
 	}
-	c.Photos = append(latest.Photos, photos...)
+	c.Photos = append(c.Photos, photos...)
 	if err := a.store.Update(c); err != nil {
 		removePhotos(a.dir, photos)
 		if errors.Is(err, ErrConflict) {

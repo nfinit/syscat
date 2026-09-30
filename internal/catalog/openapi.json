@@ -282,7 +282,8 @@
           "original_name",
           "role",
           "original_url",
-          "thumbnail_url"
+          "thumbnail_url",
+          "caption"
         ],
         "properties": {
           "original_name": {
@@ -304,6 +305,11 @@
             "type": "string",
             "format": "uri-reference",
             "description": "Root-relative URL for the display thumbnail."
+          },
+          "caption": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "Optional photo caption; empty when not supplied."
           }
         }
       },

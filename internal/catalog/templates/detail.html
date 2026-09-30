@@ -10,7 +10,7 @@
 {{else}}
 <div class="detail-layout">
   <section class="photo-gallery" aria-label="Photographs">
-    {{range .Asset.Photos}}<figure class="panel"><a href="/{{.Path}}" target="_blank" rel="noopener noreferrer"><img src="/{{.Thumbnail}}" alt="{{.Name}}"></a><figcaption>{{.Name}} <a href="/{{.Path}}" target="_blank" rel="noopener noreferrer">Open full image</a></figcaption></figure>{{else}}<div class="panel photo-placeholder"><span aria-hidden="true"></span><h2>No photos attached</h2>{{if not .Asset.Archived}}<a href="/assets/{{.Asset.ID}}/edit">Add photos</a>{{end}}</div>{{end}}
+    {{range .Asset.Photos}}<figure class="panel"><a href="/{{.Path}}" target="_blank" rel="noopener noreferrer"><img src="/{{.Thumbnail}}" alt="{{if .Caption}}{{.Caption}}{{else}}{{.Name}}{{end}}"></a><figcaption>{{if .Caption}}{{.Caption}}{{else}}{{.Name}}{{end}} <a href="/{{.Path}}" target="_blank" rel="noopener noreferrer">Open full image</a></figcaption></figure>{{else}}<div class="panel photo-placeholder"><span aria-hidden="true"></span><h2>No photos attached</h2>{{if not .Asset.Archived}}<a href="/assets/{{.Asset.ID}}/edit">Add photos</a>{{end}}</div>{{end}}
   </section>
   <section class="panel detail-info" aria-label="Entry details">
     <p class="section-label">DETAILS</p>

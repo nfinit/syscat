@@ -80,6 +80,7 @@ by ID. An invalid ID returns 400; an ID with no record returns 404.
 Each current photo provides:
 
 - `original_name`: the uploaded filename.
+- `caption`: optional descriptive text, or an empty string when absent (up to 1,000 characters).
 - `role`: `overview` for the first attached photo, `detail` for subsequent photos.
 - `original_url`: the original image, retained byte-for-byte.
 - `thumbnail_url`: the orientation-corrected JPEG display image.

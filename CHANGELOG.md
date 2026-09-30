@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.4.0 - 2026-09-30
+
+- Add optional photo captions during upload and editing, including archived
+  photo display and read-only API metadata. Existing photos need no migration.
+- Display captions inline with full-image links; JavaScript reveals caption
+  fields on demand, while plain HTML keeps the fields visible.
+
+No SQLite schema migration is required. Photo captions are additive fields in
+JSON exports and API responses; CSV columns remain unchanged.
+
 ## 0.3.1 - 2026-09-30
 
 - Make the API discoverable with a JSON index at `/api` and `/api/`, an API link
