@@ -65,10 +65,11 @@ resulting executable needs neither Go nor an installed SQLite.
   sequential keyboard tab order. Typing arbitrary locations always works.
 - Search descriptions, locations, or inventory IDs, including either `42` or
   `00042`. Active and archived records have separate collection pages.
-- Open an active entry to edit it or attach more photographs. Original intake
-  values and original photo references remain in an immutable snapshot.
+- Open an active entry to edit it, attach photographs, or mark photos for deletion
+  on save. Deletion removes original files, thumbnails, and intake photo references.
+  Other original intake values remain unchanged.
 - **Undo entry** and **Archive entry** preserve the record, number, and photos;
-  archived entries can be restored. There is no permanent deletion.
+  archived entries can be restored. Entries cannot be permanently deleted.
 - Repeated intake submissions create only one entry. Revision checks prevent
   stale forms from overwriting newer edits. Validation errors retain entered
   text; photos must be reselected after an error.

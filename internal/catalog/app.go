@@ -56,6 +56,7 @@ type page struct {
 	Count                                               int
 	Archived                                            bool
 	Saved                                               *Asset
+	DeletedPhotos                                       map[string]bool
 	Previous, Next                                      string
 }
 
@@ -381,7 +382,11 @@ func (a *App) update(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		groupOrder, err = submittedGroupOrder(r.PostForm)
 	}
-	p := page{Page: "form", Title: "Edit entry " + c.Label(), Asset: c, CSRF: s.CSRF}
+	deleted, deleteErr := submittedPhotoDeletions(r.PostForm, current.Photos)
+	if err == nil {
+		err = deleteErr
+	}
+	p := page{Page: "form", Title: "Edit entry " + c.Label(), Asset: c, CSRF: s.CSRF, DeletedPhotos: deleted}
 	if err != nil {
 		p.Error = err.Error()
 		a.form(w, http.StatusBadRequest, p)
@@ -417,12 +422,30 @@ func (a *App) update(w http.ResponseWriter, r *http.Request) {
 		a.form(w, http.StatusBadRequest, p)
 		return
 	}
+	remaining := make([]Photo, 0, len(c.Photos))
+	for _, photo := range c.Photos {
+		if !deleted[photo.Path] {
+			remaining = append(remaining, photo)
+		}
+	}
+	if len(remaining)+len(photos) == 0 {
+		p.Error = "Keep at least one photo or upload a replacement."
+		a.form(w, http.StatusBadRequest, p)
+		return
+	}
+	if deleted[overview] {
+		if len(remaining) > 0 {
+			overview = remaining[0].Path
+		} else {
+			overview = photos[0].Path
+		}
+	}
 	formerOverview := ""
 	if len(current.Photos) > 0 {
 		formerOverview = current.Photos[0].Path
 	}
-	c.Photos = groupedPhotos(append(c.Photos, photos...), overview, formerOverview, groupOrder)
-	if err := a.store.Update(c); err != nil {
+	c.Photos = groupedPhotos(append(remaining, photos...), overview, formerOverview, groupOrder)
+	if err := a.store.UpdateWithPhotoDeletions(c, deleted); err != nil {
 		removePhotos(a.dir, photos)
 		if errors.Is(err, ErrConflict) {
 			p.Error = err.Error()
@@ -432,6 +455,7 @@ func (a *App) update(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	removeDeletedPhotos(a.dir, current, deleted)
 	http.Redirect(w, r, fmt.Sprintf("/assets/%d?updated=1", c.ID), http.StatusSeeOther)
 }
 

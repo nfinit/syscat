@@ -200,3 +200,10 @@ summary { cursor: pointer; color: #617756; padding: 4px 0; }
 .group-editor { margin-top: 10px; }
 
 .photo-caption .group-edit-toggle { margin-left: 12px; }
+.photo-delete { font-size: 12px; margin-top: 10px; }
+.photo-delete input { display: inline-block; width: 16px; min-height: 0; height: 16px; vertical-align: middle; margin-right: 6px; }
+.photo-delete-toggle { border: none; background: transparent; padding: 0; font: inherit; color: #873c32; text-decoration: underline; text-underline-offset: 3px; }
+.photo-delete-toggle:hover { color: #54251f; }
+.pending-deletion img { opacity: .45; }
+.photo-delete-status { display: block; color: #873c32; font-size: 12px; }
+.photo-delete-status:not(:empty) { margin-top: 8px; }

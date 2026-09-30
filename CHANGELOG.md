@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 1.5.4 - 2026-09-30
+
+- Mark attached photos for deletion on save, with an undo control and plain HTML
+  checkboxes. Promote a remaining photo when deleting the overview; require at
+  least one photo. Remove originals, thumbnails, and intake photo references on
+  deletion, preserving all other intake fields.
+
+No SQLite schema migration is required.
+
 ## 1.5.3 - 2026-09-30
 
 - Place compact group-order controls beside the section title.

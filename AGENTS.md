@@ -12,6 +12,8 @@
 - Keep application versions, SQLite schema versions, and per-record revisions
   independent. Preserve existing inventory through versioned migrations; retain
   permanent entry IDs and original intake data.
+  Explicit photo deletion removes its original, thumbnail, and intake photo
+  references; preserve all other original intake observations.
 - Record changes under `Unreleased` in `CHANGELOG.md`. At release time, create a
   dated version section and an annotated `vMAJOR.MINOR.PATCH` Git tag. Do not move
   or reuse release tags. The initial `v0.1.0` baseline is `dce440a`.

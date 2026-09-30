@@ -98,6 +98,9 @@ Original intake is returned as stored, with photo `path` and `thumbnail` values
 instead of URL fields. Prefix those paths with `/` to retrieve the images from
 the same server. Its snapshot ID may be `0` because it was captured before the
 permanent ID was allocated; use the outer record's `id` to address the entry.
+Deleting a photo removes it from current `photos` and any original-intake photo
+references. Its original and thumbnail files are deleted after a successful save.
+Other original-intake fields remain unchanged.
 
 ## Errors
 

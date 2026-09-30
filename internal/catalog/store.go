@@ -153,11 +153,30 @@ func (s *Store) Create(c Asset, key string) (int64, error) {
 }
 
 func (s *Store) Update(c Asset) error {
+	return s.update(c, nil)
+}
+
+func (s *Store) UpdateWithPhotoDeletions(c Asset, deleted map[string]bool) error {
+	if len(deleted) == 0 {
+		return s.Update(c)
+	}
+	original, err := s.Get(c.ID)
+	if err != nil {
+		return err
+	}
+	intake, err := pruneIntakePhotos(original.Intake, deleted)
+	if err != nil {
+		return err
+	}
+	return s.update(c, string(intake))
+}
+
+func (s *Store) update(c Asset, intake any) error {
 	photos, err := json.Marshal(c.Photos)
 	if err != nil {
 		return err
 	}
-	result, err := s.db.Exec(`UPDATE assets SET description=?, location=?, photos=?, updated_at=?, revision=revision+1 WHERE id=? AND revision=? AND archived=0`, c.Description, c.Location, string(photos), time.Now().UTC().Format(time.RFC3339Nano), c.ID, c.Revision)
+	result, err := s.db.Exec(`UPDATE assets SET description=?, location=?, photos=?, intake=COALESCE(?, intake), updated_at=?, revision=revision+1 WHERE id=? AND revision=? AND archived=0`, c.Description, c.Location, string(photos), intake, time.Now().UTC().Format(time.RFC3339Nano), c.ID, c.Revision)
 	if err != nil {
 		return err
 	}

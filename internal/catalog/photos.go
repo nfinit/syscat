@@ -3,6 +3,7 @@ package catalog
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"image"
@@ -203,5 +204,55 @@ func removePhotos(dir string, photos []Photo) {
 	for _, p := range photos {
 		_ = os.Remove(filepath.Join(dir, filepath.FromSlash(p.Path)))
 		_ = os.Remove(filepath.Join(dir, filepath.FromSlash(p.Thumbnail)))
+	}
+}
+
+func submittedPhotoDeletions(values map[string][]string, photos []Photo) (map[string]bool, error) {
+	attached := make(map[string]bool, len(photos))
+	for _, photo := range photos {
+		attached[photo.Path] = true
+	}
+	deleted := make(map[string]bool)
+	for _, path := range values["delete_photo"] {
+		if !attached[path] || deleted[path] {
+			return deleted, errors.New("choose attached photos once each for deletion")
+		}
+		deleted[path] = true
+	}
+	return deleted, nil
+}
+
+// Remove deleted references while preserving every other intake field.
+func pruneIntakePhotos(raw json.RawMessage, deleted map[string]bool) (json.RawMessage, error) {
+	var intake map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &intake); err != nil {
+		return nil, err
+	}
+	var photos []Photo
+	if err := json.Unmarshal(intake["photos"], &photos); err != nil {
+		return nil, err
+	}
+	remaining := make([]Photo, 0, len(photos))
+	for _, photo := range photos {
+		if !deleted[photo.Path] {
+			remaining = append(remaining, photo)
+		}
+	}
+	if len(remaining) == len(photos) {
+		return raw, nil
+	}
+	encoded, err := json.Marshal(remaining)
+	if err != nil {
+		return nil, err
+	}
+	intake["photos"] = encoded
+	return json.Marshal(intake)
+}
+
+func removeDeletedPhotos(dir string, asset Asset, deleted map[string]bool) {
+	for _, photo := range asset.Photos {
+		if deleted[photo.Path] {
+			removePhotos(dir, []Photo{photo})
+		}
 	}
 }
