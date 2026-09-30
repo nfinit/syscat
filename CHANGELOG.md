@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 1.5.2 - 2026-09-30
+
+- Organize photos into named groups with section and photo ordering, a dedicated
+  overview, and an ungrouped Photos section. JavaScript adds collapse controls;
+  plain HTML displays all sections. Include group names in the API and JSON export.
+- Keep photos and focus in place while entering group names; saving applies
+  group assignments.
+- Reveal group editors on demand with Edit group controls beside image and caption
+  controls, using section headings for group names; plain HTML keeps
+  the fields visible.
+
+No SQLite schema migration is required. Group names are additive fields in
+JSON exports and API responses; CSV columns remain unchanged.
+
 ## 1.5.1 - 2026-09-30
 
 - Arrange attached photos before saving with move controls, or numbered positions

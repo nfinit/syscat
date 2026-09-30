@@ -283,7 +283,8 @@
           "role",
           "original_url",
           "thumbnail_url",
-          "caption"
+          "caption",
+          "group"
         ],
         "properties": {
           "original_name": {
@@ -310,6 +311,11 @@
             "type": "string",
             "maxLength": 1000,
             "description": "Optional photo caption; empty when not supplied."
+          },
+          "group": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Photo group name. Empty for the overview and ungrouped detail photos. Named groups appear in saved order, followed by ungrouped details."
           }
         }
       },

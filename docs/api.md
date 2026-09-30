@@ -80,6 +80,8 @@ by ID. An invalid ID returns 400; an ID with no record returns 404.
 Each current photo provides:
 
 - `original_name`: the uploaded filename.
+- `group`: optional group name (up to 100 characters), empty for overview and ungrouped photos.
+  Named groups are contiguous in saved order, followed by ungrouped detail photos.
 - `caption`: optional descriptive text, or an empty string when absent (up to 1,000 characters).
 - `role`: `overview` for the first current photo, `detail` for subsequent photos.
   Photos follow the saved display order. The first photo is the overview.

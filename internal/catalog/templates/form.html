@@ -17,17 +17,29 @@
   <input type="hidden" name="revision" value="{{.Asset.Revision}}">
   <div class="photo-section">
     <div class="section-label"><span class="step">01</span> PHOTOS</div>
-    {{if .Asset.Photos}}<noscript><small>Use each position number once. Position 1 is the overview.</small></noscript><div class="existing-photos">
-      {{range $index, $photo := .Asset.Photos}}<div class="existing-photo captioned-photo">
-        <label class="photo-heading">{{if eq $index 0}}Overview photo{{else}}Detail photo{{end}}</label>
-        <div class="photo-position"><label for="photo-position-{{$index}}">Position</label><input type="number" id="photo-position-{{$index}}" name="position_{{.Path}}" value="{{inc $index}}" min="1" max="{{len $.Asset.Photos}}" required></div>
-        <a href="/{{.Path}}" target="_blank" rel="noopener noreferrer"><img src="/{{.Thumbnail}}" alt="{{if .Caption}}{{.Caption}}{{else}}{{.Name}}{{end}}"></a>
-        <div class="photo-caption"><span class="caption-display">{{.Caption}}</span> <a href="/{{.Path}}" target="_blank" rel="noopener noreferrer">Open full image</a></div>
-        <div class="caption-editor" id="caption-editor-{{$index}}">
-          <label for="caption-{{$index}}">Caption <span class="optional">Optional</span></label>
-          <input type="text" id="caption-{{$index}}" name="caption_{{.Path}}" value="{{.Caption}}" maxlength="1000">
+    {{if .Asset.Photos}}
+    <noscript><small>Use each photo position once and each group position once. Select a photo to set the overview.</small></noscript>
+    <datalist id="photo-group-names">{{range .Asset.PhotoSections}}{{if .Name}}<option value="{{.Name}}">{{end}}{{end}}</datalist>
+    <div class="existing-photos">
+      {{range $section := .Asset.PhotoSections}}<section class="photo-group" data-group="{{.Name}}" {{if .Overview}}data-overview="true"{{end}}>
+        <h3 class="photo-group-heading">{{.Title}}</h3>
+        {{if .Name}}<div class="group-position"><label>Group position <input type="number" name="group_position_{{.Name}}" value="{{.Position}}" min="1" required></label></div>{{end}}
+        <div class="group-photos">
+          {{range .Photos}}<div class="existing-photo captioned-photo" data-photo="{{.Path}}">
+            <div class="photo-position"><label for="photo-position-{{.Position}}">Photo position</label><input type="number" id="photo-position-{{.Position}}" name="position_{{.Path}}" value="{{.Position}}" min="1" max="{{len $.Asset.Photos}}" required></div>
+            <a href="/{{.Path}}" target="_blank" rel="noopener noreferrer"><img src="/{{.Thumbnail}}" alt="{{if .Caption}}{{.Caption}}{{else}}{{.Name}}{{end}}"></a>
+            <label class="overview-choice"><input type="radio" name="overview_choice" value="{{.Path}}" {{if $section.Overview}}checked{{end}}> Set as overview</label>
+            <div class="photo-caption"><span class="caption-display">{{.Caption}}</span> <a href="/{{.Path}}" target="_blank" rel="noopener noreferrer">Open full image</a></div>
+            <div class="caption-editor" id="caption-editor-{{.Position}}">
+              <label for="caption-{{.Position}}">Caption <span class="optional">Optional</span></label>
+              <input type="text" id="caption-{{.Position}}" name="caption_{{.Path}}" value="{{.Caption}}" maxlength="1000">
+            </div>
+            {{if not $section.Overview}}<div class="photo-group-field">
+              <div class="group-editor"><label for="group-{{.Position}}">Group <span class="optional">Optional</span></label><input type="text" id="group-{{.Position}}" name="group_{{.Path}}" value="{{.Group}}" maxlength="100" list="photo-group-names"></div>
+            </div>{{end}}
+          </div>{{end}}
         </div>
-      </div>{{end}}
+      </section>{{end}}
     </div>{{end}}
     <div class="photo-inputs">
       {{if not .Asset.Photos}}<div class="field"><label for="photo-overview">Overview photo <span class="required">Required</span></label><input type="file" id="photo-overview" name="overview" required accept="image/jpeg,image/png,image/gif"></div>{{end}}

@@ -25,6 +25,7 @@ type Photo struct {
 	Thumbnail string `json:"thumbnail"`
 	Name      string `json:"original_name"`
 	Caption   string `json:"caption,omitempty"`
+	Group     string `json:"group,omitempty"`
 }
 
 type Asset struct {

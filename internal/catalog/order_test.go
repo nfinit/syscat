@@ -16,8 +16,8 @@ func TestPhotoOrderPreservesPhotosAndCaptions(t *testing.T) {
 	c, _ := app.store.Get(1)
 	initial := append([]Photo(nil), c.Photos...)
 	intake := string(c.Intake)
-	values := url.Values{"revision": {"1"}, "description": {"Order test"}, "position_" + initial[0].Path: {"3"}, "position_" + initial[1].Path: {"1"}, "position_" + initial[2].Path: {"2"}, "caption_" + initial[2].Path: {"Rear ports"}, "caption_photos": {"New detail"}}
-	// The first photo in the submitted order becomes the overview.
+	values := url.Values{"revision": {"1"}, "description": {"Order test"}, "overview_choice": {initial[1].Path}, "position_" + initial[0].Path: {"3"}, "position_" + initial[1].Path: {"1"}, "position_" + initial[2].Path: {"2"}, "caption_" + initial[2].Path: {"Rear ports"}, "caption_photos": {"New detail"}}
+	// Overview selection is independent of ordering within sections.
 	expect(t, b.post("/assets/1", values), 303)
 	c, _ = app.store.Get(1)
 	if c.Photos[0] != initial[1] || c.Photos[1].Path != initial[2].Path || c.Photos[1].Caption != "Rear ports" || c.Photos[2] != initial[0] {

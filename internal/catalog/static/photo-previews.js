@@ -35,8 +35,24 @@
         input.addEventListener("input", refresh);
         input.addEventListener("change", refresh);
         input.form.addEventListener("reset", function () { window.setTimeout(refresh, 0); });
-        row.appendChild(button);
+        row.insertBefore(button, row.querySelector(".group-edit-toggle"));
         toggle();
+    }
+
+    function numberUploadChoices(form) {
+        var fields = form.querySelectorAll(".photo-inputs input[type=file]");
+        var number = 0;
+        for (var pass = 0; pass < 2; pass++) {
+            for (var i = 0; i < fields.length; i++) {
+                if ((fields[i].name === "overview") !== (pass === 0)) { continue; }
+                var choices = fields[i].parentNode.querySelectorAll("[data-upload-photo]");
+                for (var j = 0; j < choices.length; j++) { choices[j].value = "upload:" + number++; }
+            }
+        }
+        if (!form.querySelector("input[name=overview_choice]:checked")) {
+            var first = form.querySelector("input[name=overview_choice]");
+            if (first) { first.checked = true; }
+        }
     }
 
     function attach(input) {
@@ -52,9 +68,7 @@
             currentURLs = [];
             preview.innerHTML = "";
             preview.style.display = "none";
-            if (!input.files || !input.files.length) {
-                return;
-            }
+            if (!input.files || !input.files.length) { numberUploadChoices(input.form); return; }
             preview.style.display = "block";
             for (var j = 0; j < input.files.length; j++) {
                 (function (file) {
@@ -102,8 +116,34 @@
                     editor.appendChild(label);
                     editor.appendChild(caption);
                     photo.appendChild(editor);
+                    var choiceLabel = document.createElement("label");
+                    choiceLabel.className = "overview-choice";
+                    var choice = document.createElement("input");
+                    choice.type = "radio";
+                    choice.name = "overview_choice";
+                    choice.setAttribute("data-upload-photo", "true");
+                    choiceLabel.appendChild(choice);
+                    choiceLabel.appendChild(document.createTextNode(" Set as overview"));
+                    photo.insertBefore(choiceLabel, row);
+                    if (input.name !== "overview") {
+                        var groupField = document.createElement("div");
+                        groupField.className = "photo-group-field";
+                        var groupLabel = document.createElement("label");
+                        var groupInput = document.createElement("input");
+                        groupInput.type = "text";
+                        groupInput.name = "group_" + input.name;
+                        groupInput.id = caption.id + "-group";
+                        groupInput.maxLength = 100;
+                        groupInput.setAttribute("list", "photo-group-names");
+                        groupLabel.htmlFor = groupInput.id;
+                        groupLabel.textContent = "Group (optional)";
+                        groupField.appendChild(groupLabel);
+                        groupField.appendChild(groupInput);
+                        photo.appendChild(groupField);
+                    }
                     preview.appendChild(photo);
                     enhanceCaption(photo);
+                    if (window.SyscatPhotoGroups && photo.querySelector(".photo-group-field")) { window.SyscatPhotoGroups.enhanceEditor(photo.querySelector(".photo-group-field")); }
                     img.onload = function () {
                         if (photo.parentNode !== preview) { return; }
                         link.style.display = "block";
@@ -116,6 +156,7 @@
                     img.src = url;
                 }(input.files[j]));
             }
+            numberUploadChoices(input.form);
         }
         input.addEventListener("change", update);
         input.form.addEventListener("reset", function () { window.setTimeout(update, 0); });

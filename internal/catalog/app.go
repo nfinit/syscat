@@ -285,7 +285,14 @@ func (a *App) create(w http.ResponseWriter, r *http.Request) {
 		a.form(w, http.StatusBadRequest, p)
 		return
 	}
-	c.Photos = photos
+	overview, err := selectedOverview(r.PostForm, nil, photos)
+	if err != nil {
+		removePhotos(a.dir, photos)
+		p.Error = err.Error() + ". Reselect photo files before submitting."
+		a.form(w, http.StatusBadRequest, p)
+		return
+	}
+	c.Photos = groupedPhotos(photos, overview, "", nil)
 	id, err := a.store.Create(c, p.Submission)
 	if err != nil {
 		removePhotos(a.dir, photos)
@@ -365,7 +372,14 @@ func (a *App) update(w http.ResponseWriter, r *http.Request) {
 		err = submittedCaptions(r.PostForm, c.Photos)
 	}
 	if err == nil {
+		err = submittedGroups(r.PostForm, c.Photos)
+	}
+	if err == nil {
 		err = submittedPhotoOrder(r.PostForm, c.Photos)
+	}
+	var groupOrder []string
+	if err == nil {
+		groupOrder, err = submittedGroupOrder(r.PostForm)
 	}
 	p := page{Page: "form", Title: "Edit entry " + c.Label(), Asset: c, CSRF: s.CSRF}
 	if err != nil {
@@ -396,7 +410,18 @@ func (a *App) update(w http.ResponseWriter, r *http.Request) {
 		a.form(w, http.StatusBadRequest, p)
 		return
 	}
-	c.Photos = append(c.Photos, photos...)
+	overview, err := selectedOverview(r.PostForm, current.Photos, photos)
+	if err != nil {
+		removePhotos(a.dir, photos)
+		p.Error = err.Error() + ". Reselect photo files before submitting."
+		a.form(w, http.StatusBadRequest, p)
+		return
+	}
+	formerOverview := ""
+	if len(current.Photos) > 0 {
+		formerOverview = current.Photos[0].Path
+	}
+	c.Photos = groupedPhotos(append(c.Photos, photos...), overview, formerOverview, groupOrder)
 	if err := a.store.Update(c); err != nil {
 		removePhotos(a.dir, photos)
 		if errors.Is(err, ErrConflict) {

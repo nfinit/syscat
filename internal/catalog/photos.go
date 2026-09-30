@@ -126,6 +126,7 @@ func saveUploads(dir string, form *multipart.Form, requireOverview bool) ([]Phot
 		return nil, errors.New("select one overview photo")
 	}
 	captions := make([]string, len(overview)+len(details))
+	groups := make([]string, len(captions))
 	if form != nil {
 		for _, field := range []string{"overview", "photos"} {
 			values := form.Value["caption_"+field]
@@ -135,6 +136,16 @@ func saveUploads(dir string, form *multipart.Form, requireOverview bool) ([]Phot
 			}
 			if len(values) != 0 && len(values) != count {
 				return nil, errors.New("photo captions do not match the selected files")
+			}
+			groupValues := form.Value["group_"+field]
+			if len(groupValues) != 0 && len(groupValues) != count {
+				return nil, errors.New("photo groups do not match the selected files")
+			}
+			for i, value := range groupValues {
+				groups[offset+i] = strings.TrimSpace(value)
+				if err := validateGroup(groups[offset+i]); err != nil {
+					return nil, err
+				}
 			}
 			for i, value := range values {
 				captions[offset+i] = strings.TrimSpace(value)
@@ -152,7 +163,7 @@ func saveUploads(dir string, form *multipart.Form, requireOverview bool) ([]Phot
 			removePhotos(dir, photos)
 			return nil, fmt.Errorf("%s: %w", header.Filename, err)
 		}
-		p.Caption = captions[i]
+		p.Caption, p.Group = captions[i], groups[i]
 		photos = append(photos, p)
 	}
 	return photos, nil

@@ -173,8 +173,8 @@ summary { cursor: pointer; color: #617756; padding: 4px 0; }
 .photo-caption { margin-top: 8px; font-size: 12px; overflow-wrap: break-word; }
 .photo-caption a { display: inline-block; margin-right: 12px; }
 .caption-display:not(:empty) { margin-right: 12px; }
-.caption-toggle, .photo-move { border: none; background: transparent; padding: 0; font: inherit; color: #235b4e; text-decoration: underline; text-underline-offset: 3px; }
-.caption-toggle:hover, .photo-move:hover { color: #102e26; }
+.caption-toggle, .group-edit-toggle, .photo-move { border: none; background: transparent; padding: 0; font: inherit; color: #235b4e; text-decoration: underline; text-underline-offset: 3px; }
+.caption-toggle:hover, .group-edit-toggle:hover, .photo-move:hover { color: #102e26; }
 
 
 .photo-position { margin-bottom: 12px; }
@@ -182,3 +182,20 @@ summary { cursor: pointer; color: #617756; padding: 4px 0; }
 .photo-order-controls { margin-bottom: 10px; }
 .photo-order-controls button { margin-right: 12px; }
 .photo-order-controls button:disabled { color: #929589; cursor: default; text-decoration: none; }
+
+.photo-group { margin-bottom: 24px; border-top: 1px solid #e7e9df; padding-top: 16px; }
+.photo-group-heading { font-size: 17px; margin: 0 0 12px; overflow-wrap: break-word; }
+.group-toggle { padding: 0; border: 0; background: transparent; color: inherit; font: inherit; font-weight: inherit; text-align: left; }
+.group-toggle::before { content: "▾ "; }
+.group-toggle[aria-expanded="false"]::before { content: "▸ "; }
+.group-position input { width: 80px; padding: 6px; }
+.group-order-controls { margin-bottom: 12px; }
+.group-order-controls button { margin-right: 12px; }
+.group-order-controls button:disabled { color: #929589; cursor: default; text-decoration: none; }
+.photo-group-field { margin-top: 12px; }
+.overview-choice { margin-top: 10px; font-size: 12px; }
+.overview-choice input { display: inline-block; width: 16px; min-height: 0; height: 16px; vertical-align: middle; margin-right: 6px; }
+
+.group-editor { margin-top: 10px; }
+
+.photo-caption .group-edit-toggle { margin-left: 12px; }

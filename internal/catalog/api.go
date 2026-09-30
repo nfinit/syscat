@@ -21,6 +21,7 @@ var openAPISpec []byte
 type apiPhoto struct {
 	Name         string `json:"original_name"`
 	Caption      string `json:"caption"`
+	Group        string `json:"group"`
 	Role         string `json:"role"`
 	OriginalURL  string `json:"original_url"`
 	ThumbnailURL string `json:"thumbnail_url"`
@@ -69,7 +70,7 @@ func asAPIAsset(c Asset) apiAsset {
 		if i == 0 {
 			role = "overview"
 		}
-		photos[i] = apiPhoto{Name: photo.Name, Caption: photo.Caption, Role: role, OriginalURL: "/" + photo.Path, ThumbnailURL: "/" + photo.Thumbnail}
+		photos[i] = apiPhoto{Name: photo.Name, Caption: photo.Caption, Group: photo.Group, Role: role, OriginalURL: "/" + photo.Path, ThumbnailURL: "/" + photo.Thumbnail}
 	}
 	return apiAsset{
 		ID: c.ID, Label: c.Label(), Title: strings.TrimSpace(c.Title()),
