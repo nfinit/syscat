@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Remove the redundant Add more photos control and additional upload fields;
+  retain multi-file selection and simplify the Add photos label.
+
 ## 1.5.4 - 2026-09-30
 
 - Mark attached photos for deletion on save, with an undo control and plain HTML

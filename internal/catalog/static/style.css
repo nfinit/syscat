@@ -167,7 +167,6 @@ summary { cursor: pointer; color: #617756; padding: 4px 0; }
  .search-form .button { padding-left: 10px; padding-right: 10px; }
 }
 
-.add-photo { display: none; margin-bottom: 10px; }
 
 .caption-editor label { margin-top: 12px; }
 .photo-preview .captioned-photo { margin-bottom: 20px; }

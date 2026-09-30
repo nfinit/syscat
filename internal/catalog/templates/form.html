@@ -44,10 +44,9 @@
     </div>{{end}}
     <div class="photo-inputs">
       {{if not .Asset.Photos}}<div class="field"><label for="photo-overview">Overview photo <span class="required">Required</span></label><input type="file" id="photo-overview" name="overview" required accept="image/jpeg,image/png,image/gif"></div>{{end}}
-      <div class="field"><label for="photo-details">{{if .Asset.Photos}}Add photos{{else}}Detail photos{{end}} <span class="optional">Optional</span></label><input type="file" id="photo-details" name="photos" accept="image/jpeg,image/png,image/gif" multiple></div>
+      <div class="field"><label for="photo-details">{{if .Asset.Photos}}Add photos{{else}}Detail photos <span class="optional">Optional</span>{{end}}</label><input type="file" id="photo-details" name="photos" accept="image/jpeg,image/png,image/gif" multiple></div>
       {{if .Asset.Photos}}<small>At least one photo is required. Deletions apply on save.</small>{{end}}
     </div>
-    <button type="button" class="button add-photo">Add more photos</button>
     <small>Select multiple detail photos where supported, or attach more by editing the entry later.</small>
     <small>JPEG, PNG, or GIF. Maximum 12 MiB and 32 megapixels per image; {{.MaxUploadMiB}} MiB total per save.</small>
   </div>

@@ -172,35 +172,12 @@
     }
 
     for (var i = 0; i < forms.length; i++) {
-        (function (form, index) {
+        (function (form) {
             var existing = form.querySelectorAll(".existing-photo");
             for (var k = 0; k < existing.length; k++) { enhanceCaption(existing[k]); }
             var container = form.querySelector(".photo-inputs");
             var inputs = container.querySelectorAll("input[type=file]");
             for (var j = 0; j < inputs.length; j++) { attach(inputs[j]); }
-            var button = form.querySelector(".add-photo");
-            if (!button || !button.addEventListener) { return; }
-            var count = 0;
-            button.addEventListener("click", function () {
-                count++;
-                var field = document.createElement("div");
-                field.className = "field";
-                var label = document.createElement("label");
-                var input = document.createElement("input");
-                input.type = "file";
-                input.id = "photo-extra-" + index + "-" + count;
-                input.name = "photos";
-                input.accept = "image/jpeg,image/png,image/gif";
-                input.multiple = true;
-                label.htmlFor = input.id;
-                label.appendChild(document.createTextNode("Additional photos"));
-                field.appendChild(label);
-                field.appendChild(input);
-                container.appendChild(field);
-                attach(input);
-                input.focus();
-            });
-            button.style.display = "inline-block";
-        }(forms[i], i));
+        }(forms[i]));
     }
 }());
