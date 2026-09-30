@@ -30,8 +30,13 @@ type browser struct {
 
 func start(t *testing.T) (*App, *browser, string) {
 	t.Helper()
+	return startWithUploadLimit(t, DefaultMaxUploadMiB)
+}
+
+func startWithUploadLimit(t *testing.T, limit int64) (*App, *browser, string) {
+	t.Helper()
 	dir := t.TempDir()
-	app, err := New(dir)
+	app, err := NewWithUploadLimit(dir, limit)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -434,6 +439,63 @@ func TestOpenEndedPhotoBatches(t *testing.T) {
 		files, err := os.ReadDir(filepath.Join(dir, folder))
 		if err != nil || len(files) != 24 {
 			t.Fatalf("rollback in %s: files=%d error=%v", folder, len(files), err)
+		}
+	}
+}
+
+func TestLargePhotoBatchAndConfiguredUploadLimit(t *testing.T) {
+	// Valid PNGs with trailing padding exercise request size without making the
+	// regression test depend on expensive high-resolution image processing.
+	data := append(pngPhoto(t), make([]byte, 4<<20)...)
+	batch := make([][]byte, 9)
+	for i := range batch {
+		batch[i] = data
+	}
+	app, b, _ := start(t)
+	form := b.get("/assets/new").Body.String()
+	if !strings.Contains(form, "256 MiB total per save") {
+		t.Fatal("default upload limit missing from form")
+	}
+	expect(t, b.upload("/assets", url.Values{"submission": {randomKey()}, "description": {"Large batch"}}, batch...), 303)
+	c, err := app.store.Get(1)
+	if err != nil || len(c.Photos) != 9 {
+		t.Fatalf("large batch: photos=%d error=%v", len(c.Photos), err)
+	}
+
+	limited, browser, dir := startWithUploadLimit(t, 1)
+	if !strings.Contains(browser.get("/assets/new").Body.String(), "1 MiB total per save") {
+		t.Fatal("configured upload limit missing from form")
+	}
+	result := browser.upload("/assets", url.Values{"submission": {randomKey()}, "description": {"Oversized request"}}, data)
+	expect(t, result, 400)
+	for _, text := range []string{"maximum total request size is 1 MiB"} {
+		if !strings.Contains(result.Body.String(), text) {
+			t.Fatalf("missing %q in rejected upload", text)
+		}
+	}
+	_, count, err := limited.store.List("", false, 50, 0)
+	if err != nil || count != 0 {
+		t.Fatalf("oversized upload created an entry: count=%d error=%v", count, err)
+	}
+	for _, folder := range []string{"photos", "thumbnails"} {
+		files, err := os.ReadDir(filepath.Join(dir, folder))
+		if err != nil || len(files) != 0 {
+			t.Fatalf("oversized upload left files in %s", folder)
+		}
+	}
+	expect(t, browser.upload("/assets", url.Values{"submission": {randomKey()}}, pngPhoto(t)), 303)
+}
+
+func TestInvalidUploadLimits(t *testing.T) {
+	for _, limit := range []int64{0, -1, 1 << 43} {
+		dir := filepath.Join(t.TempDir(), "not-created")
+		app, err := NewWithUploadLimit(dir, limit)
+		if err == nil {
+			app.Close()
+			t.Fatalf("accepted invalid limit %d", limit)
+		}
+		if _, err := os.Stat(dir); !os.IsNotExist(err) {
+			t.Fatal("invalid limit created inventory directory")
 		}
 	}
 }

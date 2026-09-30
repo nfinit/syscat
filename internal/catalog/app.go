@@ -32,17 +32,21 @@ type session struct {
 	Expires            time.Time
 }
 
+const DefaultMaxUploadMiB int64 = 256
+
 type App struct {
-	store     *Store
-	dir       string
-	templates *template.Template
-	sessions  map[string]session
-	sessionMu sync.Mutex
-	writeMu   sync.Mutex
-	handler   http.Handler
+	maxUploadMiB int64
+	store        *Store
+	dir          string
+	templates    *template.Template
+	sessions     map[string]session
+	sessionMu    sync.Mutex
+	writeMu      sync.Mutex
+	handler      http.Handler
 }
 
 type page struct {
+	MaxUploadMiB                                        int64
 	Build                                               string
 	Page, Title, Error, Notice, CSRF, Submission, Query string
 	Asset                                               Asset
@@ -56,6 +60,14 @@ type page struct {
 }
 
 func New(dir string) (*App, error) {
+	return NewWithUploadLimit(dir, DefaultMaxUploadMiB)
+}
+
+// NewWithUploadLimit sets the total request limit, including multipart overhead.
+func NewWithUploadLimit(dir string, maxUploadMiB int64) (*App, error) {
+	if maxUploadMiB < 1 || maxUploadMiB > (1<<63-1)>>20 {
+		return nil, errors.New("max-upload-mib must be a positive whole number within the supported byte range")
+	}
 	dir, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, err
@@ -74,7 +86,7 @@ func New(dir string) (*App, error) {
 		store.Close()
 		return nil, err
 	}
-	a := &App{store: store, dir: dir, templates: t, sessions: make(map[string]session)}
+	a := &App{maxUploadMiB: maxUploadMiB, store: store, dir: dir, templates: t, sessions: make(map[string]session)}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, "/assets/new", http.StatusSeeOther) })
 	mux.HandleFunc("GET /assets/new", a.newAsset)
@@ -145,6 +157,7 @@ func (a *App) remember(s session, c Asset) {
 
 func (a *App) render(w http.ResponseWriter, status int, p page) {
 	p.Build = buildinfo.String()
+	p.MaxUploadMiB = a.maxUploadMiB
 	var b bytes.Buffer
 	if err := a.templates.ExecuteTemplate(&b, "base", p); err != nil {
 		a.fail(w, err)
@@ -185,7 +198,7 @@ func (a *App) newAsset(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) parsePost(w http.ResponseWriter, r *http.Request, s session) error {
-	r.Body = http.MaxBytesReader(w, r.Body, 32<<20)
+	r.Body = http.MaxBytesReader(w, r.Body, a.maxUploadMiB<<20)
 	var err error
 	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
 		err = r.ParseMultipartForm(2 << 20)
@@ -193,7 +206,7 @@ func (a *App) parsePost(w http.ResponseWriter, r *http.Request, s session) error
 		err = r.ParseForm()
 	}
 	if err != nil {
-		return errors.New("unable to read upload; maximum total request size is 32 MB")
+		return fmt.Errorf("unable to read upload; maximum total request size is %d MiB", a.maxUploadMiB)
 	}
 	if subtle.ConstantTimeCompare([]byte(r.PostForm.Get("csrf")), []byte(s.CSRF)) != 1 {
 		return errors.New("form expired; open a new form in another tab and copy the entered values before saving")

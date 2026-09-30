@@ -79,9 +79,17 @@ ordinary uploads work; browsers without multiple selection can attach additional
 photos through subsequent edits. Edits append photos without replacing originals.
 
 There is no fixed photo-count limit per entry or save. Each save is limited to
-**32 MiB total**, and each image to **12 MiB / 32 megapixels**. Attach further
-batches through later edits. Accepted formats are JPEG, PNG, and GIF; convert
-HEIC to JPEG first.
+**256 MiB total by default**, and each image to **12 MiB / 32 megapixels**.
+Attach further batches through later edits. Configure the total request limit in whole MiB with:
+
+```sh
+./syscat --max-upload-mib 512
+```
+
+The form and upload errors display the configured limit. The total includes
+multipart form overhead. Upload and response timeouts are 15 minutes to allow
+larger batches on slower connections. Accepted formats are JPEG, PNG, and GIF;
+convert HEIC to JPEG first.
 
 Originals are retained byte-for-byte. JPEG thumbnails fit within 1,000 x 1,000
 pixels and respect EXIF orientation. GIF thumbnails use the first frame. Failed

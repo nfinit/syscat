@@ -31,6 +31,7 @@ func run() error {
 	flag.IntVar(&port, "port", 8800, "port to listen on (0 chooses an available port)")
 	flag.IntVar(&port, "p", 8800, "shorthand for --port")
 	dir := flag.String("data-dir", "./data", "directory for inventory and photographs")
+	maxUploadMiB := flag.Int64("max-upload-mib", catalog.DefaultMaxUploadMiB, "maximum total upload request size in MiB")
 	version := flag.Bool("version", false, "print application version and build commit, then exit")
 	flag.Parse()
 	if flag.NArg() != 0 {
@@ -39,6 +40,9 @@ func run() error {
 	if *version {
 		fmt.Println(buildinfo.String())
 		return nil
+	}
+	if *maxUploadMiB < 1 || *maxUploadMiB > (1<<63-1)>>20 {
+		return fmt.Errorf("max-upload-mib must be a positive whole number within the supported byte range")
 	}
 	if port < 0 || port > 65535 {
 		return fmt.Errorf("port must be between 0 and 65535")
@@ -60,7 +64,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	app, err := catalog.New(absolute)
+	app, err := catalog.NewWithUploadLimit(absolute, *maxUploadMiB)
 	if err != nil {
 		return err
 	}
@@ -69,7 +73,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	server := &http.Server{Handler: app, ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 5 * time.Minute, WriteTimeout: 5 * time.Minute, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 1 << 20}
+	server := &http.Server{Handler: app, ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 15 * time.Minute, WriteTimeout: 15 * time.Minute, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 1 << 20}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	done := make(chan struct{})
@@ -91,6 +95,7 @@ func run() error {
 		log.Printf("Access URL: %s", url)
 	}
 	log.Printf("Data directory: %s", absolute)
+	log.Printf("Maximum upload request: %d MiB", *maxUploadMiB)
 	err = server.Serve(listener)
 	close(done)
 	<-shutdownDone
