@@ -1,0 +1,457 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Syscat read-only API",
+    "version": "1",
+    "description": "Search inventory, read individual records, and retrieve photographs. No login or cookies are required. URLs are root-relative; resolve them against the server origin. No write endpoints are provided."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "security": [],
+  "paths": {
+    "/api/assets": {
+      "get": {
+        "operationId": "listAssets",
+        "summary": "Search or list inventory",
+        "description": "Newest inventory IDs first. Defaults to active records. Unknown, repeated, or invalid query parameters return 400. Original intake is omitted from listing items; fetch the individual record for it. Previous and next links are omitted when unavailable.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Case-insensitive substring search in description and location, or exact numeric ID (with or without zero padding).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000,
+              "default": 1
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "archived",
+            "in": "query",
+            "description": "Select archived records instead of active records. Empty is equivalent to false.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "",
+                "0",
+                "1",
+                "false",
+                "true"
+              ],
+              "default": "0"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated inventory",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assets/{id}": {
+      "get": {
+        "operationId": "getAsset",
+        "summary": "Read one inventory record",
+        "description": "Includes original intake. Archived records are readable by ID. Accepts numeric IDs with or without zero padding.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "description": "Positive inventory ID within signed 64-bit range."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Inventory record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Entry not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/openapi.json": {
+      "get": {
+        "operationId": "getOpenAPI",
+        "summary": "Read this API description",
+        "responses": {
+          "200": {
+            "description": "OpenAPI document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/photos/{name}": {
+      "get": {
+        "operationId": "getOriginalPhoto",
+        "summary": "Retrieve an original photograph",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filename from a returned photo URL."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Original image bytes",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/gif": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Photo not found (plain-text response)."
+          }
+        }
+      }
+    },
+    "/thumbnails/{name}": {
+      "get": {
+        "operationId": "getThumbnail",
+        "summary": "Retrieve a display thumbnail",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filename from a returned photo URL."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JPEG display thumbnail",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Thumbnail not found (plain-text response)."
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Photo": {
+        "type": "object",
+        "required": [
+          "original_name",
+          "role",
+          "original_url",
+          "thumbnail_url"
+        ],
+        "properties": {
+          "original_name": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "overview",
+              "detail"
+            ]
+          },
+          "original_url": {
+            "type": "string",
+            "format": "uri-reference",
+            "description": "Root-relative URL for the original image."
+          },
+          "thumbnail_url": {
+            "type": "string",
+            "format": "uri-reference",
+            "description": "Root-relative URL for the display thumbnail."
+          }
+        }
+      },
+      "Asset": {
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "title",
+          "description",
+          "location",
+          "photos",
+          "created_at",
+          "updated_at",
+          "revision",
+          "archived",
+          "url",
+          "api_url"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "label": {
+            "type": "string",
+            "description": "Unprefixed inventory number, padded to at least five digits."
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "photos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Photo"
+            },
+            "description": "Upload order; first photo is the overview."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri-reference",
+            "description": "Root-relative HTML entry URL."
+          },
+          "api_url": {
+            "type": "string",
+            "format": "uri-reference",
+            "description": "Root-relative API entry URL."
+          },
+          "original_intake": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Stored initial snapshot, only included on individual records. Photo paths are relative to the server root. The snapshot ID may be 0 because it predates ID allocation; use the outer record ID."
+          }
+        }
+      },
+      "AssetDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Asset"
+          },
+          {
+            "type": "object",
+            "required": [
+              "original_intake"
+            ]
+          }
+        ]
+      },
+      "AssetList": {
+        "type": "object",
+        "required": [
+          "assets",
+          "total",
+          "page",
+          "page_size",
+          "query",
+          "archived"
+        ],
+        "properties": {
+          "assets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Asset"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "query": {
+            "type": "string"
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "previous": {
+            "type": "string",
+            "format": "uri-reference"
+          },
+          "next": {
+            "type": "string",
+            "format": "uri-reference"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "invalid_request",
+                  "invalid_id",
+                  "not_found",
+                  "method_not_allowed",
+                  "internal_error"
+                ]
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

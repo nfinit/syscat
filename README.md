@@ -122,6 +122,19 @@ server, copy the backup into an empty destination, and point `--data-dir` there.
 Back up before replacing the executable for an upgrade. Startup uses versioned
 schema migrations and rejects unsupported newer schemas.
 
+## Agent and programmatic access
+
+A read-only JSON API provides paginated search, individual records with original
+intake, and URLs for original photos and thumbnails. No browser session is needed.
+
+```sh
+curl http://127.0.0.1:8800/api/assets/1
+curl 'http://127.0.0.1:8800/api/assets?q=00001&page_size=10'
+```
+
+See [API documentation](docs/api.md). The embedded OpenAPI description is served
+at `/api/openapi.json`. The API shares the catalog's network access model.
+
 ## Development
 
 ```sh
@@ -141,5 +154,5 @@ record revisions are independent. Release tags use `vMAJOR.MINOR.PATCH`; see
 Core flows use server-rendered HTML and ordinary forms; JavaScript is optional.
 The inherited browser target is approximately 2015-2016 desktop browsers and
 current phones. Actual legacy browser compatibility and physical phone camera
-behavior still need testing. APIs, system/component profiles, relationships,
+behavior still need testing. API writes, system/component profiles, relationships,
 multi-user support, and broader browser support are future work.

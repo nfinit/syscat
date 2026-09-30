@@ -3,7 +3,7 @@ package buildinfo
 
 import "runtime/debug"
 
-const Version = "0.2.0"
+const Version = "0.3.0"
 
 // modifiedAt is injected by cmd/build as Unix seconds. Plain go build leaves it
 // empty because Go's native VCS metadata does not record working-file mtimes.

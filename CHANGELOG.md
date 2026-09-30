@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.3.0 - 2026-09-30
+
+- Add a read-only JSON API for paginated inventory search and individual records,
+  including original intake and URLs for overview/detail photos and thumbnails.
+- Provide structured API errors, strict listing parameters, and an embedded
+  OpenAPI description at `/api/openapi.json`. API access requires no session.
+
+No SQLite schema or export format changes.
+
 ## 0.2.0 - 2026-09-30
 
 - Require an overview photo and description on intake and edit forms. Existing
