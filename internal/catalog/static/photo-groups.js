@@ -51,6 +51,15 @@
             toggle();
             if (expanded) { input.focus(); }
         });
+        input.addEventListener("keydown", function (event) {
+            if (event.isComposing || event.keyCode === 229) { return; }
+            if (event.key === "Enter" || event.keyCode === 13) {
+                event.preventDefault();
+                expanded = false;
+                toggle();
+                button.focus();
+            }
+        });
         row.appendChild(button);
         field.setAttribute("data-editor-enhanced", "true");
         toggle();

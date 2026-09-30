@@ -139,10 +139,12 @@
                 var field = section.querySelector(".group-position");
                 if (!field) { return; }
                 field.style.display = "none";
-                var controls = document.createElement("div");
+                var controls = document.createElement("span");
                 controls.className = "group-order-controls";
-                var up = action("Move group up", "move-group-up");
-                var down = action("Move group down", "move-group-down");
+                var up = action("Up", "move-group-up");
+                var down = action("Down", "move-group-down");
+                up.setAttribute("aria-label", "Move group up");
+                down.setAttribute("aria-label", "Move group down");
                 up.addEventListener("click", function () {
                     var named = namedSections();
                     for (var j = 1; j < named.length; j++) {
@@ -158,7 +160,7 @@
                     refresh(); (down.disabled ? up : down).focus();
                 });
                 controls.appendChild(up); controls.appendChild(down);
-                section.insertBefore(controls, field);
+                section.querySelector(".photo-group-heading").appendChild(controls);
             }
             var sections = gallery.querySelectorAll(".photo-group");
             for (var s = 0; s < sections.length; s++) { enhanceSection(sections[s]); }
@@ -199,7 +201,7 @@
                         } finally { rearranging = false; }
                     });
                     controls.appendChild(up); controls.appendChild(down); controls.appendChild(overview);
-                    photo.insertBefore(controls, photo.querySelector(".photo-position"));
+                    photo.querySelector(".photo-caption").appendChild(controls);
                     photo.querySelector(".photo-position").style.display = "none";
                     photo.querySelector(".overview-choice").style.display = "none";
                     var input = photo.querySelector(".photo-group-field input");

@@ -51,6 +51,7 @@ small { display: block; font-size: 11px; color: #7d887b; margin-top: 6px; line-h
 .photo-section .section-label { margin-bottom: 12px; }
 .muted { color: #778274; font-size: 13px; }
 .photo-inputs { margin-top: 18px; }
+.existing-photos + .photo-inputs { border-top: 1px solid #e7e9df; padding-top: 18px; }
 .photo-inputs .field { margin-bottom: 18px; }
 .photo-preview { margin-top: 12px; font-size: 12px; }
 .photo-preview a { display: block; }
@@ -179,18 +180,18 @@ summary { cursor: pointer; color: #617756; padding: 4px 0; }
 
 .photo-position { margin-bottom: 12px; }
 .photo-position input { width: 80px; padding: 6px; }
-.photo-order-controls { margin-bottom: 10px; }
+.photo-order-controls { display: inline; margin-left: 12px; }
 .photo-order-controls button { margin-right: 12px; }
 .photo-order-controls button:disabled { color: #929589; cursor: default; text-decoration: none; }
 
 .photo-group { margin-bottom: 24px; border-top: 1px solid #e7e9df; padding-top: 16px; }
-.photo-group-heading { font-size: 17px; margin: 0 0 12px; overflow-wrap: break-word; }
+.photo-group-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 16px; font-size: 17px; margin: 0 0 12px; overflow-wrap: break-word; }
+.photo-group-heading .group-toggle { min-width: 0; overflow-wrap: anywhere; }
 .group-toggle { padding: 0; border: 0; background: transparent; color: inherit; font: inherit; font-weight: inherit; text-align: left; }
 .group-toggle::before { content: "▾ "; }
 .group-toggle[aria-expanded="false"]::before { content: "▸ "; }
 .group-position input { width: 80px; padding: 6px; }
-.group-order-controls { margin-bottom: 12px; }
-.group-order-controls button { margin-right: 12px; }
+.group-order-controls { display: inline-flex; gap: 12px; font-size: 12px; font-weight: normal; white-space: nowrap; }
 .group-order-controls button:disabled { color: #929589; cursor: default; text-decoration: none; }
 .photo-group-field { margin-top: 12px; }
 .overview-choice { margin-top: 10px; font-size: 12px; }

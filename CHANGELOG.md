@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 1.5.3 - 2026-09-30
+
+- Place compact group-order controls beside the section title.
+- Separate existing photo groups from the upload area with a divider.
+- Place photo movement and overview actions in the associated caption bar.
+- Finish caption and group edits with Enter without submitting the entire form
+  or returning to the top of the page.
+
 ## 1.5.2 - 2026-09-30
 
 - Organize photos into named groups with section and photo ordering, a dedicated
