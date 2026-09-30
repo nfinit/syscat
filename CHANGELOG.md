@@ -2,12 +2,15 @@
 
 ## Unreleased
 
+## 1.5.1 - 2026-09-30
+
 - Arrange attached photos before saving with move controls, or numbered positions
   in plain HTML. The first photo becomes overview; captions and intake are preserved.
 - Remove the redundant overview selection controls; saved photo order determines
   the overview.
-
 - Simplify existing photo headings and match caption controls to full-image links.
+
+No SQLite schema or export format changes.
 
 ## 0.5.0 - 2026-09-30
 
