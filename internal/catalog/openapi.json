@@ -40,7 +40,7 @@
           {
             "name": "q",
             "in": "query",
-            "description": "Case-insensitive substring search in description and location, or exact numeric ID (with or without zero padding).",
+            "description": "Case-insensitive substring search in description, location, and current photo captions, or exact numeric ID (with or without zero padding).",
             "schema": {
               "type": "string"
             }

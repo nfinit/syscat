@@ -203,13 +203,13 @@ func (s *Store) List(query string, archived bool, limit, offset int) ([]Asset, i
 	where := ` WHERE archived=?`
 	args := []any{archived}
 	if query != "" {
-		where += ` AND ((description || ' ' || location) LIKE ? ESCAPE '\' OR id=?)`
+		where += ` AND ((description || ' ' || location) LIKE ? ESCAPE '\' OR id=? OR EXISTS (SELECT 1 FROM json_each(assets.photos) AS photo WHERE json_extract(photo.value, '$.caption') LIKE ? ESCAPE '\'))`
 		escaped := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(query)
 		id, err := strconv.ParseInt(query, 10, 64)
 		if err != nil || id < 1 {
 			id = 0
 		}
-		args = append(args, "%"+escaped+"%", id)
+		args = append(args, "%"+escaped+"%", id, "%"+escaped+"%")
 	}
 	var count int
 	if err := s.db.QueryRow("SELECT count(*) FROM assets"+where, args...).Scan(&count); err != nil {

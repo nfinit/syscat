@@ -46,14 +46,16 @@ curl 'http://127.0.0.1:8800/api/assets?archived=1'
 
 | Parameter | Default | Meaning |
 | --- | --- | --- |
-| `q` | Empty | Description/location substring search, or exact inventory ID |
+| `q` | Empty | Description/location/photo-caption substring search, or exact inventory ID |
 | `page` | `1` | Page number, from 1 to 1,000,000 |
 | `page_size` | `50` | Entries per page, from 1 to 100 |
 | `archived` | `0` | `0`/`false` for active entries; `1`/`true` for archived entries |
 
 Search uses the same behavior as the HTML catalog: case-insensitive text matching
 under SQLite's existing LIKE rules, literal `%` and `_`, and exact numeric IDs
-with or without zero padding. Results are ordered by descending inventory ID.
+with or without zero padding. Caption matching searches current photos only; an
+entry appears once even if multiple captions match. Results are ordered by
+descending inventory ID.
 Active and archived records are separate sets. Unknown, repeated, malformed, or
 out-of-range parameters return HTTP 400. Empty `archived` is treated as false.
 

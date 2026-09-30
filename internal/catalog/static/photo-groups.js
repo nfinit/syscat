@@ -12,11 +12,25 @@
         button.textContent = heading.textContent;
         body.id = "photo-group-body-" + (++nextID);
         button.setAttribute("aria-controls", body.id);
-        button.setAttribute("aria-expanded", "true");
+        var gallery = section.parentNode;
+        while (gallery && gallery.getAttribute && !gallery.getAttribute("data-photo-asset")) { gallery = gallery.parentNode; }
+        var key = gallery && gallery.getAttribute && gallery.getAttribute("data-photo-asset");
+        if (key) {
+            key = "syscat:photo-group:" + JSON.stringify([key, section.getAttribute("data-overview") ? "overview" : "group", section.getAttribute("data-group") || ""]);
+        }
+        var open = true;
+        try {
+            if (key && !document.querySelector(".error")) { open = window.localStorage.getItem(key) !== "collapsed"; }
+        } catch (ignore) { /* Storage may be disabled; collapse still works. */ }
+        body.style.display = open ? "block" : "none";
+        button.setAttribute("aria-expanded", open ? "true" : "false");
         button.addEventListener("click", function () {
             var open = button.getAttribute("aria-expanded") !== "true";
             body.style.display = open ? "block" : "none";
             button.setAttribute("aria-expanded", open ? "true" : "false");
+            try {
+                if (key) { window.localStorage.setItem(key, open ? "expanded" : "collapsed"); }
+            } catch (ignore) { /* Do not interrupt browsers that block storage. */ }
         });
         heading.textContent = "";
         heading.appendChild(button);

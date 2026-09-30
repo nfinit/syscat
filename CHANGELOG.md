@@ -2,8 +2,19 @@
 
 ## Unreleased
 
+## 1.6.0 - 2026-09-30
+
+- Search current photo captions alongside descriptions, locations, and inventory
+  IDs in the collection and read-only API.
+- Remember photo group collapse states per entry in browser storage across
+  refreshes, including archived views; retain collapse behavior without storage.
+- Start existing entries with photo editing controls hidden behind Edit photos,
+  retaining editable text fields, pending photo changes, and plain HTML controls.
+  Open photo editing after validation errors.
 - Remove the redundant Add more photos control and additional upload fields;
   retain multi-file selection and simplify the Add photos label.
+
+No SQLite schema migration is required.
 
 ## 1.5.4 - 2026-09-30
 

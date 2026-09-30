@@ -15,12 +15,12 @@
   <input type="hidden" name="csrf" value="{{.CSRF}}">
   <input type="hidden" name="submission" value="{{.Submission}}">
   <input type="hidden" name="revision" value="{{.Asset.Revision}}">
-  <div class="photo-section">
+  <div class="photo-section" {{if .Asset.ID}}data-existing-entry="true"{{end}}>
     <div class="section-label"><span class="step">01</span> PHOTOS</div>
     {{if .Asset.Photos}}
     <noscript><small>Use each photo position once and each group position once. Select a photo to set the overview.</small></noscript>
     <datalist id="photo-group-names">{{range .Asset.PhotoSections}}{{if .Name}}<option value="{{.Name}}">{{end}}{{end}}</datalist>
-    <div class="existing-photos">
+    <div class="existing-photos" data-photo-asset="{{.Asset.ID}}">
       {{range $section := .Asset.PhotoSections}}<section class="photo-group" data-group="{{.Name}}" {{if .Overview}}data-overview="true"{{end}}>
         <h3 class="photo-group-heading">{{.Title}}</h3>
         {{if .Name}}<div class="group-position"><label>Group position <input type="number" name="group_position_{{.Name}}" value="{{.Position}}" min="1" required></label></div>{{end}}
@@ -47,8 +47,8 @@
       <div class="field"><label for="photo-details">{{if .Asset.Photos}}Add photos{{else}}Detail photos <span class="optional">Optional</span>{{end}}</label><input type="file" id="photo-details" name="photos" accept="image/jpeg,image/png,image/gif" multiple></div>
       {{if .Asset.Photos}}<small>At least one photo is required. Deletions apply on save.</small>{{end}}
     </div>
-    <small>Select multiple detail photos where supported, or attach more by editing the entry later.</small>
-    <small>JPEG, PNG, or GIF. Maximum 12 MiB and 32 megapixels per image; {{.MaxUploadMiB}} MiB total per save.</small>
+    <div class="photo-upload-help"><small>Select multiple detail photos where supported, or attach more by editing the entry later.</small>
+    <small>JPEG, PNG, or GIF. Maximum 12 MiB and 32 megapixels per image; {{.MaxUploadMiB}} MiB total per save.</small></div>
   </div>
   <div class="section-label"><span class="step">02</span> DETAILS</div>
   <div class="field">

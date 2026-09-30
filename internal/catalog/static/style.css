@@ -206,3 +206,18 @@ summary { cursor: pointer; color: #617756; padding: 4px 0; }
 .pending-deletion img { opacity: .45; }
 .photo-delete-status { display: block; color: #873c32; font-size: 12px; }
 .photo-delete-status:not(:empty) { margin-top: 8px; }
+.photo-edit-mode-toggle { margin-left: 16px; border: none; background: transparent; padding: 0; font-size: 12px; font-weight: normal; letter-spacing: normal; color: #235b4e; text-decoration: underline; text-underline-offset: 3px; }
+.photo-edit-mode-toggle:hover { color: #102e26; }
+.photo-section[data-photo-editing="false"] .caption-toggle,
+.photo-section[data-photo-editing="false"] .group-edit-toggle,
+.photo-section[data-photo-editing="false"] .photo-order-controls,
+.photo-section[data-photo-editing="false"] .group-order-controls,
+.photo-section[data-photo-editing="false"] .caption-editor,
+.photo-section[data-photo-editing="false"] .photo-group-field,
+.photo-section[data-photo-editing="false"] .photo-delete,
+.photo-section[data-photo-editing="false"] .photo-delete-toggle,
+.photo-section[data-photo-editing="false"] .photo-position,
+.photo-section[data-photo-editing="false"] .group-position,
+.photo-section[data-photo-editing="false"] .overview-choice,
+.photo-section[data-photo-editing="false"] .photo-inputs,
+.photo-section[data-photo-editing="false"] .photo-upload-help { display: none !important; }

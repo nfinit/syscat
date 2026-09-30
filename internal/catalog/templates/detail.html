@@ -9,7 +9,7 @@
 <p class="timestamp">Added {{.Asset.CreatedAt}}<br>Updated {{.Asset.UpdatedAt}}</p>
 {{else}}
 <div class="detail-layout">
-  <section class="photo-gallery" aria-label="Photographs">
+  <section class="photo-gallery" aria-label="Photographs" data-photo-asset="{{.Asset.ID}}">
     {{range .Asset.PhotoSections}}<section class="photo-group" data-group="{{.Name}}" {{if .Overview}}data-overview="true"{{end}}>
       <h3 class="photo-group-heading">{{.Title}}</h3><div class="group-photos">
         {{range .Photos}}<figure class="panel"><a href="/{{.Path}}" target="_blank" rel="noopener noreferrer"><img src="/{{.Thumbnail}}" alt="{{if .Caption}}{{.Caption}}{{else}}{{.Name}}{{end}}"></a><figcaption>{{if .Caption}}{{.Caption}}{{else}}{{.Name}}{{end}} <a href="/{{.Path}}" target="_blank" rel="noopener noreferrer">Open full image</a></figcaption></figure>{{end}}

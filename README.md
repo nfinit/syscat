@@ -63,11 +63,16 @@ resulting executable needs neither Go nor an installed SQLite.
   saving and remembered locations in this initial Cardcat-derived baseline.
 - The location picker opens only when explicitly chosen and stays out of the
   sequential keyboard tab order. Typing arbitrary locations always works.
-- Search descriptions, locations, or inventory IDs, including either `42` or
+- Search descriptions, locations, photo captions, or inventory IDs, including either `42` or
   `00042`. Active and archived records have separate collection pages.
 - Open an active entry to edit it, attach photographs, or mark photos for deletion
   on save. Deletion removes original files, thumbnails, and intake photo references.
   Other original intake values remain unchanged.
+- Existing entries keep text fields editable; **Edit photos** reveals photo
+  controls and uploads. Hiding those controls preserves pending changes, which
+  **Save changes** saves. Without JavaScript, all photo controls remain available.
+- Group collapse states are remembered per entry in this browser. Validation
+  errors temporarily open groups so photo corrections remain accessible.
 - **Undo entry** and **Archive entry** preserve the record, number, and photos;
   archived entries can be restored. Entries cannot be permanently deleted.
 - Repeated intake submissions create only one entry. Revision checks prevent
