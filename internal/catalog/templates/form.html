@@ -1,0 +1,51 @@
+{{define "form"}}
+{{if .Saved}}<div class="notice saved" role="status">
+  <strong>Entry saved.</strong> <a href="/assets/{{.Saved.ID}}">{{.Saved.Label}}</a> - {{.Saved.Title}}
+  <form method="post" action="/assets/{{.Saved.ID}}/archive" class="inline-form">
+    <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="revision" value="{{.Saved.Revision}}"><input type="hidden" name="archived" value="1">
+    <button class="text-button" type="submit">Undo entry</button>
+  </form>
+</div>{{end}}
+<div class="page-heading"><h1>{{.Title}}</h1></div>
+{{template "entry-form" .}}
+{{end}}
+
+{{define "entry-form"}}
+<form method="post" action="{{if .Asset.ID}}/assets/{{.Asset.ID}}{{else}}/assets{{end}}" enctype="multipart/form-data" class="panel entry-form">
+  <input type="hidden" name="csrf" value="{{.CSRF}}">
+  <input type="hidden" name="submission" value="{{.Submission}}">
+  <input type="hidden" name="revision" value="{{.Asset.Revision}}">
+  <div class="photo-section">
+    <div class="section-label"><span class="step">01</span> PHOTOS <span class="section-aside">Optional</span></div>
+    {{if .Asset.Photos}}<div class="existing-photos">{{range .Asset.Photos}}<div class="existing-photo"><a href="/{{.Path}}" target="_blank" rel="noopener noreferrer"><img src="/{{.Thumbnail}}" alt="{{.Name}}"></a><a href="/{{.Path}}" target="_blank" rel="noopener noreferrer">Open full image</a></div>{{end}}</div>{{end}}
+    <div class="photo-inputs">
+      {{if not .Asset.Photos}}<div class="field"><label for="photo-overview">Overview photo</label><input type="file" id="photo-overview" name="photos" accept="image/jpeg,image/png,image/gif"></div>{{end}}
+      <div class="field"><label for="photo-details">{{if .Asset.Photos}}Add detail or followup photos{{else}}Detail photos{{end}}</label><input type="file" id="photo-details" name="photos" accept="image/jpeg,image/png,image/gif" multiple></div>
+    </div>
+    <button type="button" class="button add-photo">Add more photos</button>
+    <small>Select multiple detail photos where supported, or attach more by editing the entry later. The first photo is used in the collection.</small>
+    <small>JPEG, PNG, or GIF. Maximum 12 MB and 32 megapixels per image; 32 MB total per save.</small>
+  </div>
+  <div class="section-label"><span class="step">02</span> DETAILS</div>
+  <div class="field">
+    <label for="location">Location</label>
+    <input type="text" id="location" name="location" value="{{.Asset.Location}}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" maxlength="500" placeholder="Workshop / shelf B / bin 12" aria-describedby="location-help">
+    <small id="location-help">{{if .Asset.ID}}Physical storage location.{{else}}Retained for subsequent entries in this session.{{end}}</small>
+    {{if .Locations}}<details class="existing-picker" data-field="location">
+      <summary tabindex="-1">Choose an existing location</summary>
+      <label for="existing-location">Previous locations</label>
+      <select id="existing-location" tabindex="-1"><option value="">Choose a location...</option>{{range .Locations}}<option value="{{.}}">{{.}}</option>{{end}}</select>
+      <button type="button" class="button" tabindex="-1">Use</button>
+    </details>{{end}}
+  </div>
+  <div class="field description-field">
+    <label for="description">Description</label>
+    <textarea id="description" name="description" rows="8" maxlength="20000" placeholder="Describe the system, markings, condition, or anything to investigate later." aria-describedby="description-help">{{.Asset.Description}}</textarea>
+    <small id="description-help">Start with a short description on the first line, then add as much detail as you know. All fields are optional.</small>
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="button primary">{{if .Asset.ID}}Save changes{{else}}Save &amp; add another{{end}}</button>
+    {{if .Asset.ID}}<a href="/assets/{{.Asset.ID}}">Discard changes</a>{{else}}<span class="action-hint">Inventory ID assigned on save.</span>{{end}}
+  </div>
+</form>
+{{end}}

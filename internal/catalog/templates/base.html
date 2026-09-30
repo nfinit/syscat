@@ -1,0 +1,32 @@
+{{define "base"}}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{.Title}} - Syscat</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="/assets/new"><span class="brand-mark" aria-hidden="true">S</span> syscat<span class="brand-caption">INVENTORY</span></a>
+      <nav aria-label="Main navigation">
+        <a href="/assets/new" {{if and (eq .Page "form") (not .Asset.ID)}}class="active"{{end}}>Intake</a>
+        <a href="/assets" {{if or (and (eq .Page "list") (not .Archived)) (and .Asset.ID (not .Asset.Archived))}}class="active"{{end}}>Collection</a>
+        <a href="/assets?archived=1" {{if .Archived}}class="active"{{end}}>Archive</a>
+      </nav>
+    </div>
+  </header>
+  <main id="main" class="shell">
+    {{if .Notice}}<div class="notice" role="status">{{.Notice}}</div>{{end}}
+    {{if .Error}}<div class="error" role="alert"><strong>Entry not saved</strong><p>{{.Error}}</p></div>{{end}}
+    {{if eq .Page "form"}}{{template "form" .}}{{end}}
+    {{if eq .Page "list"}}{{template "list" .}}{{end}}
+    {{if eq .Page "detail"}}{{template "detail" .}}{{end}}
+  </main>
+  <footer class="site-footer"><span>{{.Build}}</span></footer>
+  {{if or (eq .Page "form") (and (eq .Page "detail") (not .Asset.Archived))}}<script src="/static/existing-values.js" defer></script><script src="/static/photo-previews.js" defer></script>{{end}}
+</body>
+</html>{{end}}

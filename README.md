@@ -1,2 +1,134 @@
-# syscat
-Quick inventory management solution for large collections of computer systems
+# Syscat
+
+Quick inventory intake for collections of computer systems. Photograph a machine,
+record its location and what you know, and identify or classify it later.
+
+Phase 0 adapts Cardcat's intake workflow into an independent systems catalog. It runs as one Go executable with an embedded web UI
+and SQLite database. No separate web server, database service, or frontend build
+is needed.
+
+## Build and run
+
+With Go 1.25 or newer:
+
+```sh
+go run ./cmd/build
+./syscat
+```
+
+Syscat listens on **all interfaces on port 8800** by default, ready for clients
+on the server's network. Startup prints the data directory and access URLs using
+the server's local interface addresses. From another computer, open
+**http://<server-address>:8800**; on the server itself, use
+**http://127.0.0.1:8800**. Firewall rules still determine which clients can connect.
+The reported addresses are local interface addresses, not a public address
+behind a router or NAT.
+
+Startup creates `./data`. Run from the same directory next time, or choose a
+fixed data directory:
+
+```sh
+./syscat --data-dir /path/to/syscat-data
+```
+
+Use `--listen` to bind a specific interface or restrict access to the server:
+
+```sh
+./syscat --listen 192.168.1.10:8800
+./syscat --listen 127.0.0.1:8800
+```
+
+There is no login in phase 0; anyone who can reach the server can read and change
+its inventory. Run it on your trusted workshop network.
+
+`-p` / `--port` overrides the port in `--listen` while retaining its bind address.
+Port `0` chooses an available port and prints the actual address. `--help` lists
+options; Ctrl+C stops gracefully. The build helper produces `syscat.exe` on
+Windows. `CGO_ENABLED=0 go run ./cmd/build` builds without a C compiler; the
+resulting executable needs neither Go nor an installed SQLite.
+
+## Intake
+
+- One entry per physical system. All fields and photos are optional.
+- Permanent inventory IDs have no prefix: `00001`, `00002`, and so on. Numbers
+  are never reused; padding is for display and grows beyond five digits.
+- Enter location and one detailed description. Start the description with a
+  short identifying line, then add observations, specifications, condition, or
+  research questions. Structured classifications are deferred.
+- **Save & add another** retains location in the browser session. Sessions reset
+  on server restart or after 24 hours of inactivity. Cookies are required for
+  saving and remembered locations in this initial Cardcat-derived baseline.
+- The location picker opens only when explicitly chosen and stays out of the
+  sequential keyboard tab order. Typing arbitrary locations always works.
+- Search descriptions, locations, or inventory IDs, including either `42` or
+  `00042`. Active and archived records have separate collection pages.
+- Open an active entry to edit it or attach more photographs. Original intake
+  values and original photo references remain in an immutable snapshot.
+- **Undo entry** and **Archive entry** preserve the record, number, and photos;
+  archived entries can be restored. There is no permanent deletion.
+- Repeated intake submissions create only one entry. Revision checks prevent
+  stale forms from overwriting newer edits. Validation errors retain entered
+  text; photos must be reselected after an error.
+
+## Photos
+
+Intake offers an overview photo and detail photos. The first attached image is
+used in the collection. Supporting browsers can select multiple detail files,
+add more file inputs, and show local previews before saving. Without JavaScript,
+ordinary uploads work; browsers without multiple selection can attach additional
+photos through subsequent edits. Edits append photos without replacing originals.
+
+There is no fixed photo-count limit per entry or save. Each save is limited to
+**32 MiB total**, and each image to **12 MiB / 32 megapixels**. Attach further
+batches through later edits. Accepted formats are JPEG, PNG, and GIF; convert
+HEIC to JPEG first.
+
+Originals are retained byte-for-byte. JPEG thumbnails fit within 1,000 x 1,000
+pixels and respect EXIF orientation. GIF thumbnails use the first frame. Failed
+uploads do not save a partial entry; newly written files are removed on normal
+validation or save failures. Local previews offer links to view images in a
+separate tab.
+
+## Data, exports, and backups
+
+```text
+data/
+  syscat.sqlite3
+  photos/
+  thumbnails/
+```
+
+Keep live data on local storage on the server. Syscat starts with its own empty
+inventory; importing Cardcat inventory is deferred.
+
+Collection and Archive each offer CSV and JSON exports. Both include photo paths,
+not image bytes; JSON also preserves original intake. CSV escapes potential
+spreadsheet formulas. Exports alone are not complete backups.
+
+For a consistent backup, stop Syscat and wait for it to exit, copy the **entire
+data directory**, then restart with the same `--data-dir`. To restore, stop the
+server, copy the backup into an empty destination, and point `--data-dir` there.
+Back up before replacing the executable for an upgrade. Startup uses versioned
+schema migrations and rejects unsupported newer schemas.
+
+## Development
+
+```sh
+go test ./...
+go test -race ./...
+go vet ./...
+```
+
+The application version lives in `internal/buildinfo/buildinfo.go`. Footer,
+startup log, and `--version` show the same `Syscat <version> <short-commit>` build
+identity. The build helper adds `-modified.<unix-seconds>` for changed source;
+direct `go build -o syscat ./cmd/syscat` uses `-modified`. Missing VCS metadata is
+shown as `unknown`. Git is not needed at runtime. Versions, schema versions, and
+record revisions are independent. Release tags use `vMAJOR.MINOR.PATCH`; see
+[CHANGELOG.md](CHANGELOG.md) for release notes.
+
+Core flows use server-rendered HTML and ordinary forms; JavaScript is optional.
+The inherited browser target is approximately 2015-2016 desktop browsers and
+current phones. Actual legacy browser compatibility and physical phone camera
+behavior still need testing. APIs, system/component profiles, relationships,
+multi-user support, and broader browser support are future work.

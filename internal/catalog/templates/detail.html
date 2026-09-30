@@ -1,0 +1,31 @@
+{{define "detail"}}
+<div class="page-heading">
+  <p class="eyebrow"><a href="/assets{{if .Asset.Archived}}?archived=1{{end}}">Back to {{if .Asset.Archived}}Archive{{else}}Collection{{end}}</a> <span class="heading-divider">/</span> {{.Asset.Label}}</p>
+  <h1>{{.Asset.Title}}</h1>
+  {{if .Asset.Archived}}<p class="archive-status">Archived entry</p>{{end}}
+</div>
+{{if not .Asset.Archived}}
+{{template "entry-form" .}}
+<p class="timestamp">Added {{.Asset.CreatedAt}}<br>Updated {{.Asset.UpdatedAt}}</p>
+{{else}}
+<div class="detail-layout">
+  <section class="photo-gallery" aria-label="Photographs">
+    {{range .Asset.Photos}}<figure class="panel"><a href="/{{.Path}}" target="_blank" rel="noopener noreferrer"><img src="/{{.Thumbnail}}" alt="{{.Name}}"></a><figcaption>{{.Name}} <a href="/{{.Path}}" target="_blank" rel="noopener noreferrer">Open full image</a></figcaption></figure>{{else}}<div class="panel photo-placeholder"><span aria-hidden="true"></span><h2>No photos attached</h2>{{if not .Asset.Archived}}<a href="/assets/{{.Asset.ID}}/edit">Add photos</a>{{end}}</div>{{end}}
+  </section>
+  <section class="panel detail-info" aria-label="Entry details">
+    <p class="section-label">DETAILS</p>
+    <dl>
+      <dt>Inventory ID</dt><dd class="mono">{{.Asset.Label}}</dd>
+      <dt>Location</dt><dd>{{if .Asset.Location}}{{.Asset.Location}}{{else}}Not recorded{{end}}</dd>
+    </dl>
+    <h2 class="small-heading">Description</h2><p class="description">{{.Asset.Description}}</p>
+    <p class="timestamp">Added {{.Asset.CreatedAt}}<br>Updated {{.Asset.UpdatedAt}}</p>
+  </section>
+</div>
+{{end}}
+{{if .Original}}<details class="original-intake panel"><summary>Original intake</summary><p class="muted">Original values retained from initial entry.</p><dl><dt>Description</dt><dd class="description">{{.Original.Description}}</dd><dt>Location</dt><dd>{{.Original.Location}}</dd></dl></details>{{end}}
+<form method="post" action="/assets/{{.Asset.ID}}/archive" class="archive-action">
+  <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="revision" value="{{.Asset.Revision}}">
+  {{if .Asset.Archived}}<input type="hidden" name="archived" value="0"><button type="submit" class="button">Restore to collection</button>{{else}}<input type="hidden" name="archived" value="1"><button type="submit" class="text-button">Archive entry</button> <span class="muted">Preserves the record and photos for later restoration.</span>{{end}}
+</form>
+{{end}}
