@@ -39,6 +39,25 @@
         toggle();
     }
 
+    function numberUploadChoices(form) {
+        // Match the server's upload order: overview field, then detail fields.
+        var inputs = form.querySelectorAll(".photo-inputs input[type=file]");
+        var number = 0;
+        for (var pass = 0; pass < 2; pass++) {
+            for (var i = 0; i < inputs.length; i++) {
+                if ((inputs[i].name === "overview") !== (pass === 0)) { continue; }
+                var choices = inputs[i].parentNode.querySelectorAll("[data-upload-photo]");
+                for (var j = 0; j < choices.length; j++) {
+                    choices[j].value = "upload:" + number++;
+                }
+            }
+        }
+        if (!form.querySelector("input[name=overview_choice]:checked")) {
+            var first = form.querySelector("input[name=overview_choice]");
+            if (first) { first.checked = true; }
+        }
+    }
+
     function attach(input) {
         if (!canPreview || !("files" in input) || !input.addEventListener) { return; }
         var preview = document.createElement("div");
@@ -52,7 +71,10 @@
             currentURLs = [];
             preview.innerHTML = "";
             preview.style.display = "none";
-            if (!input.files || !input.files.length) { return; }
+            if (!input.files || !input.files.length) {
+                numberUploadChoices(input.form);
+                return;
+            }
             preview.style.display = "block";
             for (var j = 0; j < input.files.length; j++) {
                 (function (file) {
@@ -100,6 +122,15 @@
                     editor.appendChild(label);
                     editor.appendChild(caption);
                     photo.appendChild(editor);
+                    var choiceLabel = document.createElement("label");
+                    choiceLabel.className = "overview-choice";
+                    var choice = document.createElement("input");
+                    choice.type = "radio";
+                    choice.name = "overview_choice";
+                    choice.setAttribute("data-upload-photo", "true");
+                    choiceLabel.appendChild(choice);
+                    choiceLabel.appendChild(document.createTextNode(" Use as overview"));
+                    photo.insertBefore(choiceLabel, row);
                     preview.appendChild(photo);
                     enhanceCaption(photo);
                     img.onload = function () {
@@ -114,6 +145,7 @@
                     img.src = url;
                 }(input.files[j]));
             }
+            numberUploadChoices(input.form);
         }
         input.addEventListener("change", update);
         input.form.addEventListener("reset", function () { window.setTimeout(update, 0); });

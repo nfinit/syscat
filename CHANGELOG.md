@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.5.0 - 2026-09-30
+
+- Mark an existing or newly selected photo as overview, moving it first while
+  retaining every attached photo and its caption. New uploads can be selected
+  before saving; original intake remains unchanged.
+
+No SQLite schema or export format changes.
+
 ## 0.4.0 - 2026-09-30
 
 - Add optional photo captions during upload and editing, including archived

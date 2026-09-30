@@ -353,7 +353,7 @@
             "items": {
               "$ref": "#/components/schemas/Photo"
             },
-            "description": "Upload order; first photo is the overview."
+            "description": "Current display order; first photo is the selected overview."
           },
           "created_at": {
             "type": "string",

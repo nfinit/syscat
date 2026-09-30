@@ -174,3 +174,6 @@ summary { cursor: pointer; color: #617756; padding: 4px 0; }
 .photo-caption a { display: inline-block; margin-right: 12px; }
 .caption-display:not(:empty) { margin-right: 12px; }
 .caption-toggle { min-height: 36px; }
+
+.overview-choice { margin-top: 10px; font-size: 12px; }
+.overview-choice input { display: inline-block; width: 16px; min-height: 0; height: 16px; vertical-align: middle; margin-right: 6px; }

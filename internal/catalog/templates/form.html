@@ -21,6 +21,7 @@
       {{range $index, $photo := .Asset.Photos}}<div class="existing-photo captioned-photo">
         <label>{{if eq $index 0}}Overview photo <span class="required">Required</span>{{else}}Detail photo <span class="optional">Optional</span>{{end}}</label>
         <a href="/{{.Path}}" target="_blank" rel="noopener noreferrer"><img src="/{{.Thumbnail}}" alt="{{if .Caption}}{{.Caption}}{{else}}{{.Name}}{{end}}"></a>
+        <label class="overview-choice" for="overview-choice-{{$index}}"><input type="radio" id="overview-choice-{{$index}}" name="overview_choice" value="{{.Path}}" {{if eq $index 0}}checked{{end}}> Use as overview</label>
         <div class="photo-caption"><span class="caption-display">{{.Caption}}</span> <a href="/{{.Path}}" target="_blank" rel="noopener noreferrer">Open full image</a></div>
         <div class="caption-editor" id="caption-editor-{{$index}}">
           <label for="caption-{{$index}}">Caption <span class="optional">Optional</span></label>
@@ -30,7 +31,7 @@
     </div>{{end}}
     <div class="photo-inputs">
       {{if not .Asset.Photos}}<div class="field"><label for="photo-overview">Overview photo <span class="required">Required</span></label><input type="file" id="photo-overview" name="overview" required accept="image/jpeg,image/png,image/gif"></div>{{end}}
-      <div class="field"><label for="photo-details">{{if .Asset.Photos}}Add detail or followup photos{{else}}Detail photos{{end}} <span class="optional">Optional</span></label><input type="file" id="photo-details" name="photos" accept="image/jpeg,image/png,image/gif" multiple></div>
+      <div class="field"><label for="photo-details">{{if .Asset.Photos}}Add photos{{else}}Detail photos{{end}} <span class="optional">Optional</span></label><input type="file" id="photo-details" name="photos" accept="image/jpeg,image/png,image/gif" multiple></div>
     </div>
     <button type="button" class="button add-photo">Add more photos</button>
     <small>Select multiple detail photos where supported, or attach more by editing the entry later.</small>

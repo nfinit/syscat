@@ -279,6 +279,12 @@ func (a *App) create(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, err)
 		return
 	}
+	overview, err := overviewSelection(r.PostForm, nil, uploadCount(r.MultipartForm))
+	if err != nil {
+		p.Error = err.Error()
+		a.form(w, http.StatusBadRequest, p)
+		return
+	}
 	photos, err := saveUploads(a.dir, r.MultipartForm, true)
 	if err != nil {
 		p.Error = err.Error() + ". Entered text retained. Reselect photo files before submitting."
@@ -286,6 +292,7 @@ func (a *App) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c.Photos = photos
+	promoteOverview(c.Photos, overview)
 	id, err := a.store.Create(c, p.Submission)
 	if err != nil {
 		removePhotos(a.dir, photos)
@@ -387,6 +394,12 @@ func (a *App) update(w http.ResponseWriter, r *http.Request) {
 		a.form(w, http.StatusConflict, p)
 		return
 	}
+	overview, err := overviewSelection(r.PostForm, c.Photos, uploadCount(r.MultipartForm))
+	if err != nil {
+		p.Error = err.Error()
+		a.form(w, http.StatusBadRequest, p)
+		return
+	}
 	photos, err := saveUploads(a.dir, r.MultipartForm, len(latest.Photos) == 0)
 	if err != nil {
 		p.Error = err.Error() + ". Entered text retained. Reselect photo files before submitting."
@@ -394,6 +407,7 @@ func (a *App) update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c.Photos = append(c.Photos, photos...)
+	promoteOverview(c.Photos, overview)
 	if err := a.store.Update(c); err != nil {
 		removePhotos(a.dir, photos)
 		if errors.Is(err, ErrConflict) {

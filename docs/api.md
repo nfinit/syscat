@@ -81,7 +81,8 @@ Each current photo provides:
 
 - `original_name`: the uploaded filename.
 - `caption`: optional descriptive text, or an empty string when absent (up to 1,000 characters).
-- `role`: `overview` for the first attached photo, `detail` for subsequent photos.
+- `role`: `overview` for the first current photo, `detail` for subsequent photos.
+  Choosing an overview moves it first and retains the previous overview as a detail photo.
 - `original_url`: the original image, retained byte-for-byte.
 - `thumbnail_url`: the orientation-corrected JPEG display image.
 
