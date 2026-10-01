@@ -368,7 +368,7 @@ func TestPhotoEXIFOrientation(t *testing.T) {
 
 func TestRejectNewerSchema(t *testing.T) {
 	app, _, dir := start(t)
-	if _, err := app.store.db.Exec("PRAGMA user_version=3"); err != nil {
+	if _, err := app.store.db.Exec("PRAGMA user_version=4"); err != nil {
 		t.Fatal(err)
 	}
 	app.Close()
@@ -524,8 +524,8 @@ func TestRequiredOverviewAndDescription(t *testing.T) {
 	}{
 		{"Missing overview", nil, nil, "an overview photo is required"},
 		{"Details alone", nil, [][]byte{data}, "an overview photo is required"},
-		{"", data, nil, "a description is required"},
-		{" \t\r\n ", data, nil, "a description is required"},
+		{"", data, nil, "a short description is required"},
+		{" \t\r\n ", data, nil, "a short description is required"},
 		{"Invalid overview", []byte("invalid image"), [][]byte{data}, "unsupported or invalid image"},
 	}
 	for _, tc := range cases {
@@ -553,7 +553,7 @@ func TestRequiredOverviewAndDescription(t *testing.T) {
 	}
 	for _, route := range []string{"/assets/1", "/assets/1/edit"} {
 		form := b.get(route).Body.String()
-		if strings.Contains(form, `id="photo-overview"`) || !strings.Contains(form, `name="description" required`) {
+		if strings.Contains(form, `id="photo-overview"`) || !strings.Contains(form, `name="short_description" required`) {
 			t.Fatalf("existing photo not recognized or description not required on %s", route)
 		}
 	}

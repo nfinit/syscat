@@ -22,12 +22,12 @@
       <dt>Catalog number</dt><dd class="mono">{{.Asset.Label}}</dd>
       <dt>Location</dt><dd>{{if .Asset.Location}}{{.Asset.Location}}{{else}}Not recorded{{end}}</dd>
     </dl>
-    <h2 class="small-heading">Description</h2><p class="description">{{.Asset.Description}}</p>
+    <h2 class="small-heading">Details</h2><p class="description">{{if .Asset.Details}}{{.Asset.Details}}{{else}}Not recorded{{end}}</p>
     <p class="timestamp">Added {{.Asset.CreatedAt}}<br>Updated {{.Asset.UpdatedAt}}</p>
   </section>
 </div>
 {{end}}
-{{if .Original}}<details class="original-intake panel"><summary>Original intake</summary><p class="muted">Original values retained from initial entry.</p><dl><dt>Description</dt><dd class="description">{{.Original.Description}}</dd><dt>Location</dt><dd>{{.Original.Location}}</dd></dl></details>{{end}}
+{{if .Original}}<details class="original-intake panel"><summary>Original intake</summary><p class="muted">Original values retained from initial entry.</p><dl>{{if .Original.ShortDescription}}<dt>Short description</dt><dd>{{.Original.ShortDescription}}</dd><dt>Details</dt><dd class="description">{{.Original.Details}}</dd>{{else}}<dt>Description</dt><dd class="description">{{.Original.Description}}</dd>{{end}}<dt>Location</dt><dd>{{.Original.Location}}</dd></dl></details>{{end}}
 <form method="post" action="/assets/{{.Asset.ID}}/archive" class="archive-action">
   <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="revision" value="{{.Asset.Revision}}">
   {{if .Asset.Archived}}<input type="hidden" name="archived" value="0"><button type="submit" class="button">Restore to collection</button>{{else}}<input type="hidden" name="archived" value="1"><button type="submit" class="text-button">Archive entry</button> <span class="muted">Preserves the record and photos for later restoration.</span>{{end}}

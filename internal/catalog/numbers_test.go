@@ -51,7 +51,7 @@ func TestCatalogNumberMigrationPreservesInventory(t *testing.T) {
 		}
 	}
 	var version int
-	if err := store.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 2 {
+	if err := store.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 3 {
 		t.Fatal(version, err)
 	}
 	id, err := store.Create(Asset{Description: "New intake"}, randomKey())

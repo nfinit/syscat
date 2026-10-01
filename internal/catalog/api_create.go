@@ -57,7 +57,7 @@ func (a *App) apiCreateAsset(w http.ResponseWriter, r *http.Request) {
 	}
 	for field, values := range form.Value {
 		switch field {
-		case "description", "location":
+		case "description", "short_description", "details", "location":
 			if len(values) != 1 {
 				apiError(w, 400, "invalid_request", "Submit one value for "+field)
 				return
@@ -74,15 +74,15 @@ func (a *App) apiCreateAsset(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	description := ""
 	location := ""
-	if values := form.Value["description"]; len(values) == 1 {
-		description = strings.TrimSpace(values[0])
-	}
 	if values := form.Value["location"]; len(values) == 1 {
 		location = strings.TrimSpace(values[0])
 	}
-	asset := Asset{Description: description, Location: location}
+	asset := Asset{Location: location}
+	if err := descriptionForm(form.Value, &asset); err != nil {
+		apiError(w, 400, "invalid_request", err.Error())
+		return
+	}
 	if err := validate(asset); err != nil {
 		apiError(w, 400, "invalid_request", err.Error())
 		return

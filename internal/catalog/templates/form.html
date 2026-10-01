@@ -62,9 +62,14 @@
       <button type="button" class="button" tabindex="-1">Use</button>
     </details>{{end}}
   </div>
+  <div class="field">
+    <label for="short-description">Short description <span class="required">Required</span></label>
+    <input type="text" id="short-description" name="short_description" required maxlength="20000" value="{{.Asset.ShortDescription}}" placeholder="System name or model">
+  </div>
   <div class="field description-field">
-    <label for="description">Description <span class="required">Required</span></label>
-    <textarea id="description" name="description" required rows="8" maxlength="20000" placeholder="Describe the system, markings, condition, or anything to investigate later.">{{.Asset.Description}}</textarea>
+    <label for="details">Details <span class="optional">Optional</span></label>
+    <textarea id="details" name="details" rows="8" maxlength="20000" placeholder="Specifications, observations, condition, or research notes.">
+{{.Asset.Details}}</textarea>
   </div>
   <div class="form-actions">
     <button type="submit" class="button primary">{{if .Asset.ID}}Save changes{{else}}Save &amp; add another{{end}}</button>

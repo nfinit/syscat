@@ -35,6 +35,8 @@ type apiAsset struct {
 	Label            string          `json:"label"`
 	Title            string          `json:"title"`
 	Description      string          `json:"description"`
+	ShortDescription string          `json:"short_description"`
+	Details          string          `json:"details"`
 	Location         string          `json:"location"`
 	Photos           []apiPhoto      `json:"photos"`
 	CreatedAt        string          `json:"created_at"`
@@ -102,7 +104,7 @@ func asAPIAsset(c Asset) apiAsset {
 	}
 	return apiAsset{
 		ID: c.ID, CatalogNumber: c.CatalogNumber, Label: c.Label(), Title: strings.TrimSpace(c.Title()),
-		Description: c.Description, Location: c.Location, Photos: photos,
+		Description: c.Description, ShortDescription: c.ShortDescription, Details: c.Details, Location: c.Location, Photos: photos,
 		CreatedAt: c.CreatedAt, UpdatedAt: c.UpdatedAt, Revision: c.Revision,
 		Archived: c.Archived, URL: fmt.Sprintf("/assets/%d", c.ID),
 		APIURL: fmt.Sprintf("/api/assets/%d", c.ID), Intake: c.Intake,
@@ -185,9 +187,9 @@ func (a *App) apiList(w http.ResponseWriter, r *http.Request) {
 		field = query.Get("field")
 	}
 	switch field {
-	case "all", "title", "description", "location", "caption", "id", "catalog_number":
+	case "all", "title", "short_description", "details", "description", "location", "caption", "id", "catalog_number":
 	default:
-		apiError(w, 400, "invalid_request", "field must be all, title, description, location, caption, id, or catalog_number")
+		apiError(w, 400, "invalid_request", "field must be all, title, short_description, details, description, location, caption, id, or catalog_number")
 		return
 	}
 	search := strings.TrimSpace(query.Get("q"))

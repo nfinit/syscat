@@ -38,16 +38,18 @@ func (p Photo) ID() string {
 }
 
 type Asset struct {
-	ID            int64           `json:"id"`
-	CatalogNumber int64           `json:"catalog_number,omitempty"`
-	Description   string          `json:"description"`
-	Location      string          `json:"location"`
-	Photos        []Photo         `json:"photos"`
-	CreatedAt     string          `json:"created_at"`
-	UpdatedAt     string          `json:"updated_at"`
-	Revision      int             `json:"revision"`
-	Archived      bool            `json:"archived"`
-	Intake        json.RawMessage `json:"original_intake,omitempty"`
+	ID               int64           `json:"id"`
+	CatalogNumber    int64           `json:"catalog_number,omitempty"`
+	Description      string          `json:"description"`
+	ShortDescription string          `json:"short_description"`
+	Details          string          `json:"details"`
+	Location         string          `json:"location"`
+	Photos           []Photo         `json:"photos"`
+	CreatedAt        string          `json:"created_at"`
+	UpdatedAt        string          `json:"updated_at"`
+	Revision         int             `json:"revision"`
+	Archived         bool            `json:"archived"`
+	Intake           json.RawMessage `json:"original_intake,omitempty"`
 }
 
 func (c Asset) Label() string {
@@ -58,10 +60,14 @@ func (c Asset) Label() string {
 	return fmt.Sprintf("%05d", number)
 }
 func (c Asset) Title() string {
-	if c.Description == "" {
+	if c.ShortDescription == "" && c.Description == "" && c.Details == "" {
 		return "Unidentified item"
 	}
-	title := []rune(strings.SplitN(c.Description, "\n", 2)[0])
+	short := c.ShortDescription
+	if short == "" {
+		short, _ = splitDescription(c.Description)
+	}
+	title := []rune(short)
 	if len(title) > 120 {
 		return string(title[:120]) + "..."
 	}
@@ -102,10 +108,10 @@ func (s *Store) initialize() error {
 	if err := tx.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
 		return err
 	}
-	if version > 2 {
-		return fmt.Errorf("database schema %d is newer than this Syscat supports (2)", version)
+	if version > 3 {
+		return fmt.Errorf("database schema %d is newer than this Syscat supports (3)", version)
 	}
-	for next := version + 1; next <= 2; next++ {
+	for next := version + 1; next <= 3; next++ {
 		script, err := migrations.ReadFile(fmt.Sprintf("migrations/%03d.sql", next))
 		if err != nil {
 			return err
@@ -120,14 +126,14 @@ func (s *Store) initialize() error {
 	return tx.Commit()
 }
 
-const columns = `id, catalog_number, description, location, photos, created_at, updated_at, revision, archived, intake`
+const columns = `id, catalog_number, description, short_description, details, location, photos, created_at, updated_at, revision, archived, intake`
 
 type scanner interface{ Scan(...any) error }
 
 func scanAsset(row scanner) (Asset, error) {
 	var c Asset
 	var photos, intake string
-	err := row.Scan(&c.ID, &c.CatalogNumber, &c.Description, &c.Location, &photos, &c.CreatedAt, &c.UpdatedAt, &c.Revision, &c.Archived, &intake)
+	err := row.Scan(&c.ID, &c.CatalogNumber, &c.Description, &c.ShortDescription, &c.Details, &c.Location, &photos, &c.CreatedAt, &c.UpdatedAt, &c.Revision, &c.Archived, &intake)
 	if err != nil {
 		return c, err
 	}
@@ -147,6 +153,11 @@ func (s *Store) BySubmission(key string) (Asset, error) {
 }
 
 func (s *Store) Create(c Asset, key string) (int64, error) {
+	if c.ShortDescription == "" && c.Details == "" {
+		c.setLegacyDescription(c.Description)
+	} else {
+		c.projectDescription()
+	}
 	if c.Photos == nil {
 		c.Photos = []Photo{}
 	}
@@ -166,7 +177,7 @@ func (s *Store) Create(c Asset, key string) (int64, error) {
 		return 0, err
 	}
 	defer tx.Rollback()
-	result, err := tx.Exec(`INSERT INTO assets(description, location, photos, intake, created_at, updated_at, submission_key) VALUES(?,?,?,?,?,?,?)`, c.Description, c.Location, string(photos), string(intake), now, now, key)
+	result, err := tx.Exec(`INSERT INTO assets(description, short_description, details, location, photos, intake, created_at, updated_at, submission_key) VALUES(?,?,?,?,?,?,?,?,?)`, c.Description, c.ShortDescription, c.Details, c.Location, string(photos), string(intake), now, now, key)
 	if err != nil {
 		return 0, err
 	}
@@ -217,11 +228,20 @@ func (s *Store) UpdateWithPhotoDeletions(c Asset, deleted map[string]bool) error
 }
 
 func (s *Store) update(c Asset, intake any) error {
+	original, err := s.Get(c.ID)
+	if err != nil {
+		return err
+	}
+	if c.Description != original.Description && c.ShortDescription == original.ShortDescription && c.Details == original.Details {
+		c.setLegacyDescription(c.Description)
+	} else if c.ShortDescription != original.ShortDescription || c.Details != original.Details {
+		c.projectDescription()
+	}
 	photos, err := json.Marshal(c.Photos)
 	if err != nil {
 		return err
 	}
-	result, err := s.db.Exec(`UPDATE assets SET description=?, location=?, photos=?, intake=COALESCE(?, intake), updated_at=?, revision=revision+1 WHERE id=? AND revision=? AND archived=0`, c.Description, c.Location, string(photos), intake, time.Now().UTC().Format(time.RFC3339Nano), c.ID, c.Revision)
+	result, err := s.db.Exec(`UPDATE assets SET description=?, short_description=?, details=?, location=?, photos=?, intake=COALESCE(?, intake), updated_at=?, revision=revision+1 WHERE id=? AND revision=? AND archived=0`, c.Description, c.ShortDescription, c.Details, c.Location, string(photos), intake, time.Now().UTC().Format(time.RFC3339Nano), c.ID, c.Revision)
 	if err != nil {
 		return err
 	}
@@ -256,10 +276,10 @@ func assetSearchWhere(query string, archived bool, field string) (string, []any)
 		}
 		switch field {
 		case "title":
-			where += ` AND (CASE WHEN instr(description,char(10))>0 THEN substr(description,1,instr(description,char(10))-1) ELSE description END) LIKE ? ESCAPE '\'`
+			where += ` AND short_description LIKE ? ESCAPE '\'`
 			args = append(args, pattern)
-		case "description", "location":
-			// The column name comes only from these two fixed choices.
+		case "short_description", "details", "description", "location":
+			// The column name comes only from these fixed choices.
 			where += ` AND ` + field + ` LIKE ? ESCAPE '\'`
 			args = append(args, pattern)
 		case "caption":
@@ -327,7 +347,7 @@ func (s *Store) listSummariesWithField(query string, archived bool, limit, offse
 		return nil, 0, err
 	}
 	args = append(args, limit, offset)
-	rows, err := s.db.Query(`SELECT id, catalog_number, CASE WHEN instr(description,char(10))>0 THEN substr(description,1,instr(description,char(10))-1) ELSE description END, description='', revision, COALESCE(json_array_length(photos),0), archived FROM assets`+where+" ORDER BY catalog_number DESC LIMIT ? OFFSET ?", args...)
+	rows, err := s.db.Query(`SELECT id, catalog_number, short_description, description='', revision, COALESCE(json_array_length(photos),0), archived FROM assets`+where+" ORDER BY catalog_number DESC LIMIT ? OFFSET ?", args...)
 	if err != nil {
 		return nil, 0, err
 	}

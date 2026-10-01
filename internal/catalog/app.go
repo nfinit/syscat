@@ -242,18 +242,25 @@ func (a *App) parsePost(w http.ResponseWriter, r *http.Request, s session) error
 	return nil
 }
 
-func submitted(r *http.Request) Asset {
-	c := Asset{Description: strings.TrimSpace(r.PostForm.Get("description")), Location: strings.TrimSpace(r.PostForm.Get("location"))}
+func submitted(r *http.Request) (Asset, error) {
+	c := Asset{Location: strings.TrimSpace(r.PostForm.Get("location"))}
 	c.Revision, _ = strconv.Atoi(r.PostForm.Get("revision"))
-	return c
+	err := descriptionForm(r.PostForm, &c)
+	return c, err
 }
 
 func validate(c Asset) error {
-	if strings.TrimSpace(c.Description) == "" {
-		return errors.New("a description is required")
+	if c.ShortDescription == "" && c.Details == "" {
+		c.setLegacyDescription(c.Description)
 	}
-	if len(c.Description) > 20000 || len(c.Location) > 500 {
-		return errors.New("field limits: description 20,000 bytes; location 500")
+	if strings.TrimSpace(c.ShortDescription) == "" {
+		return errors.New("a short description is required")
+	}
+	if strings.ContainsAny(c.ShortDescription, "\r\n") {
+		return errors.New("short description must be a single line")
+	}
+	if len(c.ShortDescription) > 20000 || len(c.Details) > 20000 || len(c.Location) > 500 {
+		return errors.New("field limits: short description and details 20,000 UTF-8 bytes each; location 500")
 	}
 	return nil
 }
@@ -268,7 +275,10 @@ func (a *App) create(w http.ResponseWriter, r *http.Request) {
 	s := a.getSession(w, r)
 	err := a.parsePost(w, r, s)
 	defer cleanupForm(r)
-	c := submitted(r)
+	c, descriptionErr := submitted(r)
+	if err == nil {
+		err = descriptionErr
+	}
 	p := page{Page: "form", Title: "New entry", Asset: c, CSRF: s.CSRF, Submission: r.PostForm.Get("submission")}
 	if err != nil {
 		p.Error = err.Error()
@@ -382,7 +392,22 @@ func (a *App) update(w http.ResponseWriter, r *http.Request) {
 	s := a.getSession(w, r)
 	err := a.parsePost(w, r, s)
 	defer cleanupForm(r)
-	c := submitted(r)
+	c, descriptionErr := submitted(r)
+	if err == nil {
+		err = descriptionErr
+	}
+	if _, splitForm := r.PostForm["short_description"]; splitForm {
+		// Browsers normalize textarea line endings. Preserve the stored notes
+		// when their content is unchanged, including leading blank lines.
+		if normalizedFormText(c.Details) == normalizedFormText(current.Details) {
+			c.Details = current.Details
+		}
+		if c.ShortDescription == current.ShortDescription && c.Details == current.Details {
+			c.Description = current.Description
+		} else {
+			c.projectDescription()
+		}
+	}
 	c.CatalogNumber = current.CatalogNumber
 	c.ID, c.Photos = current.ID, append([]Photo(nil), current.Photos...)
 	if err == nil {
@@ -568,13 +593,13 @@ func (a *App) export(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	out := csv.NewWriter(w)
-	_ = out.Write([]string{"id", "label", "description", "location", "photos", "created_at", "updated_at", "archived", "catalog_number"})
+	_ = out.Write([]string{"id", "label", "description", "location", "photos", "created_at", "updated_at", "archived", "catalog_number", "short_description", "details"})
 	for _, c := range assets {
 		paths := []string{}
 		for _, p := range c.Photos {
 			paths = append(paths, p.Path)
 		}
-		row := []string{strconv.FormatInt(c.ID, 10), c.Label(), c.Description, c.Location, strings.Join(paths, ";"), c.CreatedAt, c.UpdatedAt, strconv.FormatBool(c.Archived), strconv.FormatInt(c.CatalogNumber, 10)}
+		row := []string{strconv.FormatInt(c.ID, 10), c.Label(), c.Description, c.Location, strings.Join(paths, ";"), c.CreatedAt, c.UpdatedAt, strconv.FormatBool(c.Archived), strconv.FormatInt(c.CatalogNumber, 10), c.ShortDescription, c.Details}
 		// Keep spreadsheet programs from interpreting freeform observations as formulas.
 		for i, value := range row {
 			trimmed := strings.TrimLeft(value, " \t\r\n")

@@ -49,8 +49,8 @@ resulting executable needs neither Go nor an installed SQLite.
 
 ## Intake
 
-- One entry per physical system. An overview photo and description are required;
-  location and detail photos are optional. Existing photos satisfy the overview
+- One entry per physical system. An overview photo and short description are required;
+  details, location, and detail photos are optional. Existing photos satisfy the overview
   requirement when editing. Older entries without photos need an overview before
   saving changes.
 - Permanent record IDs remain sequential and keep all links stable. Displayed
@@ -58,9 +58,9 @@ resulting executable needs neither Go nor an installed SQLite.
   match record IDs; if that number is occupied, new intake uses the next free
   number above it. **Change number** previews a move or a swap with the occupant.
   Archived numbers remain reserved. Display padding grows beyond five digits.
-- Enter location and one detailed description. Start the description with a
-  short identifying line, then add observations, specifications, condition, or
-  research questions. Structured classifications are deferred.
+- Short description supplies the display title. Use Details for observations,
+  specifications, condition, or research questions. API clients can PATCH either
+  field independently. Structured classifications are deferred.
 - **Save & add another** retains location in the browser session. Sessions reset
   on server restart or after 24 hours of inactivity. Cookies are required for
   saving and remembered locations in this initial Cardcat-derived baseline.
@@ -134,11 +134,15 @@ data directory**, then restart with the same `--data-dir`. To restore, stop the
 server, copy the backup into an empty destination, and point `--data-dir` there.
 Back up before replacing the executable for an upgrade. Startup uses versioned
 schema migrations and rejects unsupported newer schemas.
+The schema-3 description migration runs once at startup, splitting existing text
+at the first newline without rewriting original intake. Early testers can build
+the updated executable and start it with their existing `--data-dir`.
 
 ## Agent and programmatic access
 
 A JSON API provides paginated search, records with original intake, and photo URLs.
-PATCH endpoints edit current descriptions, locations, captions, and groups using
+PATCH endpoints independently edit short descriptions, details, locations,
+captions, and groups using
 asset revision checks and stable photo IDs. Multipart POST creates new records
 with original intake or attaches photos to existing records, using the shared
 image privacy and thumbnail pipeline. Creation supports persistent retry keys. A dedicated catalog-number endpoint

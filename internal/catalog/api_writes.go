@@ -124,7 +124,11 @@ func apiPatchText(values map[string]json.RawMessage, field string, target *strin
 	if err := json.Unmarshal(raw, &value); err != nil {
 		return fmt.Errorf("%s must be a string", field)
 	}
-	*target = strings.TrimSpace(value)
+	if field == "details" {
+		*target = value
+	} else {
+		*target = strings.TrimSpace(value)
+	}
 	return nil
 }
 
@@ -192,7 +196,7 @@ func (a *App) apiEditedAsset(w http.ResponseWriter, id int64, status int) {
 }
 
 func (a *App) apiPatchAsset(w http.ResponseWriter, r *http.Request) {
-	values, ok := apiPatchObject(w, r, "description", "location")
+	values, ok := apiPatchObject(w, r, "description", "short_description", "details", "location")
 	if !ok {
 		return
 	}
@@ -207,9 +211,33 @@ func (a *App) apiPatchAsset(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if err := apiPatchText(values, "description", &c.Description); err != nil {
-		apiError(w, 400, "invalid_request", err.Error())
+	_, legacy := values["description"]
+	_, short := values["short_description"]
+	_, details := values["details"]
+	if legacy && (short || details) {
+		apiError(w, 400, "invalid_request", "Use description or short_description/details, not both.")
 		return
+	}
+	if legacy {
+		if err := apiPatchText(values, "description", &c.Description); err != nil {
+			apiError(w, 400, "invalid_request", err.Error())
+			return
+		}
+		if len(c.Description) > 20000 {
+			apiError(w, 400, "invalid_request", "Legacy description must be 20,000 UTF-8 bytes or fewer.")
+			return
+		}
+		c.setLegacyDescription(c.Description)
+	} else if short || details {
+		if err := apiPatchText(values, "short_description", &c.ShortDescription); err != nil {
+			apiError(w, 400, "invalid_request", err.Error())
+			return
+		}
+		if err := apiPatchText(values, "details", &c.Details); err != nil {
+			apiError(w, 400, "invalid_request", err.Error())
+			return
+		}
+		c.projectDescription()
 	}
 	if err := apiPatchText(values, "location", &c.Location); err != nil {
 		apiError(w, 400, "invalid_request", err.Error())

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 1.7.0 - 2026-10-01
+
+- Split descriptions into required single-line short descriptions and optional
+  details in intake/edit/archive views, with independent API PATCH and multipart
+  creation fields. Preserve the combined description for early-client compatibility.
+- Add a one-time schema-3 startup migration preserving existing body formatting,
+  original intake, IDs, catalog numbers, revisions, timestamps, and photo files.
+- Add short-description/details search fields and export columns; retain existing
+  title display behavior and legacy search/write support.
+
 ## 1.6.4 - 2026-09-30
 
 - Add mutable catalog numbers alongside permanent sequential record IDs, with a

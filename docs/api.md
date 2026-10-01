@@ -10,7 +10,7 @@ it is accessible to anyone who can reach this trusted-network server.
 | `GET /api/assets` | Paginated listing and search |
 | `POST /api/assets` | Create a record with overview and optional detail photos |
 | `GET /api/assets/{id}` | Full current record and original intake |
-| `PATCH /api/assets/{id}` | Update current description or location |
+| `PATCH /api/assets/{id}` | Update current short description, details, or location |
 | `PATCH /api/assets/{id}/photos/{photo_id}` | Update a current photo caption or group |
 | `POST /api/assets/{id}/photos` | Attach one or more photos to an existing asset |
 | `POST /api/assets/{id}/catalog-number` | Move or swap a catalog number |
@@ -57,7 +57,7 @@ curl 'http://127.0.0.1:8800/api/assets?field=caption&q=unknown+chip'
 | Parameter | Default | Meaning |
 | --- | --- | --- |
 | `q` | Empty | Description/location/photo-caption substring search, or exact permanent ID/catalog number |
-| `field` | `all` | Restrict `q` to `all`, `title`, `description`, `location`, `caption`, `id`, or `catalog_number` |
+| `field` | `all` | Restrict `q` to `all`, `title`, `description`, `location`, `caption`, `id`, `catalog_number`, `short_description`, or `details` |
 | `page` | `1` | Page number, from 1 to 1,000,000 |
 | `page_size` | `50` | Entries per page, from 1 to 100 |
 | `archived` | `0` | `0`/`false` for active entries; `1`/`true` for archived entries |
@@ -68,9 +68,10 @@ under SQLite's existing LIKE rules, literal `%` and `_`, and exact numeric IDs
 with or without zero padding. Caption matching searches current photos only; an
 entry appears once even if multiple captions match. Results are ordered by
 descending current catalog number.
-`field=title` searches the complete first description line, including text beyond
-the display title's truncation limit. `field=description` searches the whole
-current description, including its title line. `field=location` searches only
+`field=title` and `field=short_description` search the complete short description,
+including text beyond the display title's truncation limit. `field=details`
+searches longer notes only. `field=description` searches the legacy combined
+projection, including the short description and details. `field=location` searches only
 location; `field=caption` searches current photo captions; `field=id` matches only
 an exact positive permanent record ID (zero padding is allowed).
 `field=catalog_number` matches only the current catalog number. Broad search
@@ -115,7 +116,7 @@ curl http://127.0.0.1:8800/api/assets/00001
 
 Each record contains permanent numeric `id`, mutable `catalog_number`, display
 `label`, a short `title`, the full
-`description`, `location`, ordered `photos`, `created_at`, `updated_at`,
+`short_description`, `details`, legacy combined `description`, `location`, ordered `photos`, `created_at`, `updated_at`,
 `revision`, and `archived`. It also provides `url` for the HTML entry and
 `api_url` for its JSON representation, `photo_upload_url` for attaching photos,
 and `catalog_number_url` for renumbering. URLs always use permanent `id`, never
@@ -169,12 +170,14 @@ revision and original intake. A concurrent or stale edit returns HTTP 409 with
 `error.code: "conflict"`; reread the asset and reconcile before retrying. Archived
 entries cannot be edited through the API; restore them in the web interface first.
 
-For asset text, supply `description`, `location`, or both:
+For asset text, supply `short_description`, `details`, `location`, or any
+combination. Omitted fields remain unchanged, so a title-only edit preserves all
+longer notes:
 
 ```sh
 curl -X PATCH http://127.0.0.1:8800/api/assets/1 \
   -H 'Content-Type: application/json' \
-  -d '{"revision":7,"description":"Researched identification and notes."}'
+  -d '{"revision":7,"short_description":"IBM RS/6000 43P Model 150"}'
 ```
 
 For a photo, follow its `api_url` or use its `id`:
@@ -189,8 +192,9 @@ These example revisions must be replaced with the asset’s actual current revis
 Revision belongs to the whole asset, including photo edits. Photo PATCH returns
 an asset, not a standalone photo: locate the photo by its stable `id` in the result.
 
-Omitted fields remain unchanged. Text is trimmed; an empty string clears location,
-caption, or group. Description must remain nonempty. Setting a detail photo’s group
+Omitted fields remain unchanged. Short descriptions and other metadata text are
+trimmed; details preserve whitespace and paragraph formatting. An empty string clears location,
+caption, group, or details. Short description must remain nonempty and single-line. Setting a detail photo’s group
 normalizes section ordering while preserving existing group order where possible;
 the overview cannot join a named group. IDs, paths, image bytes, intake, timestamps,
 and archive state cannot be supplied as editable fields.
@@ -198,16 +202,16 @@ and archive state cannot be supplied as editable fields.
 Bodies must be a single JSON object with `Content-Type: application/json`, limited
 to 128 KiB, with revision and at least one editable field. Null values, unknown or
 duplicate fields, invalid types, and query parameters are rejected. Limits match
-the web form: description 20,000 UTF-8 bytes, location 500 UTF-8 bytes, caption
+the web form: short description and details 20,000 UTF-8 bytes each, location 500 UTF-8 bytes, caption
 1,000 characters, and single-line group names 100 characters.
 
 ## Creating records
 
-POST multipart form data to `/api/assets`, with a nonempty `description` and
-exactly one `overview` file. `location`, `caption_overview`, and any number of
-`photos` detail files are optional. Description is trimmed and limited to 20,000
-UTF-8 bytes, with its first line supplying the title; location is trimmed and
-limited to 500 UTF-8 bytes. Both scalar fields must appear at most once.
+POST multipart form data to `/api/assets`, with a nonempty single-line `short_description` and
+exactly one `overview` file. `details`, `location`, `caption_overview`, and any number of
+`photos` detail files are optional. Short description is trimmed; details preserve their exact text. Both are limited
+to 20,000 UTF-8 bytes each; short description supplies the title. Location is trimmed and
+limited to 500 UTF-8 bytes. Each scalar field must appear at most once.
 The overview is always ungrouped. Detail `caption_photos` and `group_photos`
 follow the same file-order/count rules as attachment uploads below. Captions
 are limited to 1,000 characters and single-line groups to 100 characters.
@@ -215,7 +219,8 @@ are limited to 1,000 characters and single-line groups to 100 characters.
 ```sh
 curl http://127.0.0.1:8800/api/assets \
   -H 'Idempotency-Key: recycler-intake-2026-09-30-example' \
-  --form-string 'description=Unidentified desktop system' \
+  --form-string 'short_description=Unidentified desktop system' \
+  --form-string 'details=Acquired as photographed; configuration to investigate.' \
   --form-string 'location=Workbench' \
   -F 'overview=@system.jpg' \
   --form-string 'caption_overview=As acquired' \
@@ -342,6 +347,32 @@ Collection and API lists now sort by descending catalog number. JSON exports add
 `catalog_number`; CSV preserves its existing columns and appends `catalog_number`,
 with `id` remaining permanent and `label` reflecting the current catalog number.
 
+## Description migration and early-client compatibility
+
+Database schema 3 adds `short_description` and `details`. The bundled migration
+runs once during startup for existing inventory: text before the first newline
+becomes the short description, and everything after it becomes details. CRLF
+first-line endings are normalized for the single-line field; body formatting,
+including blank lines and indentation, is retained. The existing combined
+`description`, original intake JSON, IDs, catalog numbers, timestamps, revisions,
+and photo files are unchanged by migration. Single-line descriptions get empty
+details. No separate migration command is required: early testers can build the
+updated executable and restart it with the same data directory.
+
+Full API responses and JSON/CSV exports include the independent fields. CSV
+retains all existing columns and appends `short_description` and `details`.
+Summaries continue to omit long notes. Display title retains its existing
+120-character truncation; the full short-description field and field searches
+preserve all text.
+
+The combined `description` field remains a deprecated compatibility projection.
+Early clients may still create or PATCH it; the first line replaces the short
+description and the rest replaces details, so those writes affect both fields.
+Legacy writes retain their 20,000-byte combined limit. A request cannot mix
+`description` with `short_description` or `details`; this returns HTTP 400.
+Use the new fields for independent edits. Older original-intake snapshots retain
+their legacy combined text; new snapshots include both fields and the projection.
+
 ## Errors
 
 ```json
@@ -358,5 +389,5 @@ image/plain-text responses rather than the API error envelope.
 
 The machine-readable contract is available at `/api/openapi.json` and in
 [the source specification](../internal/catalog/openapi.json). It includes image
-retrieval as well as inventory endpoints. No new runtime dependencies or database
-migrations are required.
+retrieval as well as inventory endpoints. No new runtime dependencies are required;
+database upgrades use the bundled startup migrations described above.
