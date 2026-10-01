@@ -179,6 +179,9 @@ record revisions are independent. Release tags use `vMAJOR.MINOR.PATCH`; see
 [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 Core flows use server-rendered HTML and ordinary forms; JavaScript is optional.
+With JavaScript, the footer offers a Light UI/Dark UI control. The theme follows the
+system preference until you choose a mode, then remembers that choice in this
+browser. Without JavaScript, the interface uses the light theme.
 The inherited browser target is approximately 2015-2016 desktop browsers and
 current phones. Actual legacy browser compatibility and physical phone camera
 behavior still need testing. System/component profiles, relationships,

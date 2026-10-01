@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 1.7.2 - 2026-10-01
+
+- Add a JavaScript-enabled footer dark-mode toggle with a saved browser choice,
+  system-preference default, and a plain light theme without JavaScript.
+  Right-align the control and label it with the destination, Light UI or Dark UI.
+- Shift the light interface from green tones to soft blue surfaces, borders,
+  text, buttons, suggestion highlights, and photo controls.
+- Restyle the header with a black background, white/gray branding and navigation,
+  and monochrome active, hover, and keyboard focus states.
+- Keep the catalog-number form's action bar within its panel on narrow screens.
+
 ## 1.7.1 - 2026-10-01
 
 - Replace the Location selector with filtered in-page suggestions that preserve
