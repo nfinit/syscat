@@ -1,6 +1,7 @@
 package catalog
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -67,11 +68,22 @@ func savePhoto(dir string, header *multipart.FileHeader) (Photo, error) {
 	if _, err := src.Seek(0, io.SeekStart); err != nil {
 		return Photo{}, err
 	}
+	raw, err := io.ReadAll(io.LimitReader(src, maxPhotoBytes+1))
+	if err != nil {
+		return Photo{}, err
+	}
+	if len(raw) > maxPhotoBytes {
+		return Photo{}, errors.New("each photo must be 12 MB or smaller")
+	}
+	cleaned, err := stripPhotoMetadata(raw, format)
+	if err != nil {
+		return Photo{}, err
+	}
 	file, err := os.OpenFile(filepath.Join(dir, filepath.FromSlash(p.Path)), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 	if err != nil {
 		return Photo{}, err
 	}
-	_, copyErr := io.Copy(file, io.LimitReader(src, maxPhotoBytes+1))
+	_, copyErr := io.Copy(file, bytes.NewReader(cleaned))
 	closeErr := file.Close()
 	if copyErr != nil {
 		return Photo{}, copyErr

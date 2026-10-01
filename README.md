@@ -100,7 +100,11 @@ multipart form overhead. Upload and response timeouts are 15 minutes to allow
 larger batches on slower connections. Accepted formats are JPEG, PNG, and GIF;
 convert HEIC to JPEG first.
 
-Originals are retained byte-for-byte. JPEG thumbnails fit within 1,000 x 1,000
+New uploads remove location-capable metadata, including EXIF GPS, XMP/IPTC,
+comments, and opaque vendor metadata. JPEGs retain only the EXIF orientation
+needed for correct display. Image data is preserved without recompression;
+display-related color metadata and GIF animation controls remain intact. Existing
+uploads require a separate cleanup. JPEG thumbnails fit within 1,000 x 1,000
 pixels and respect EXIF orientation. GIF thumbnails use the first frame. Failed
 uploads do not save a partial entry; newly written files are removed on normal
 validation or save failures. Local previews offer links to view images in a

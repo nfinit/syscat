@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.6.1 - 2026-09-30
+
+- Strip location-capable metadata from new JPEG, PNG, and GIF uploads without
+  recompressing image data. Preserve JPEG orientation, color metadata, and GIF
+  animation; reject malformed image structures instead of saving them unchanged.
+  Existing photos are not automatically modified.
+
 ## 1.6.0 - 2026-09-30
 
 - Search current photo captions alongside descriptions, locations, and inventory

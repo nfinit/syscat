@@ -95,6 +95,8 @@ the API request. For example, `/photos/example.jpg` from a request to
 `http://10.0.0.81:8800/api/assets/1` is retrieved from
 `http://10.0.0.81:8800/photos/example.jpg`. No image bytes are embedded in JSON.
 Retrieve thumbnails for quick visual inspection and originals for small markings.
+New uploads have location-capable metadata removed from the served originals;
+JPEG orientation is retained. Existing images are unchanged by this upload policy.
 
 Original intake is returned as stored, with photo `path` and `thumbnail` values
 instead of URL fields. Prefix those paths with `/` to retrieve the images from
