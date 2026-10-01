@@ -125,7 +125,7 @@ data/
 Keep live data on local storage on the server. Syscat starts with its own empty
 inventory; importing Cardcat inventory is deferred.
 
-Collection and Archive each offer CSV and JSON exports. Both include photo paths,
+Assets and Archive each offer CSV and JSON exports. Both include photo paths,
 not image bytes; JSON also preserves original intake. CSV escapes potential
 spreadsheet formulas. Exports alone are not complete backups.
 

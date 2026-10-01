@@ -14,7 +14,7 @@
       <a class="brand" href="/assets/new">syscat<span class="brand-caption">INVENTORY</span></a>
       <nav aria-label="Main navigation">
         <a href="/assets/new" {{if and (eq .Page "form") (not .Asset.ID)}}class="active"{{end}}>Intake</a>
-        <a href="/assets" {{if or (and (eq .Page "list") (not .Archived)) (and .Asset.ID (not .Asset.Archived))}}class="active"{{end}}>Collection</a>
+        <a href="/assets" {{if or (and (eq .Page "list") (not .Archived)) (and .Asset.ID (not .Asset.Archived))}}class="active"{{end}}>Assets</a>
         <a href="/assets?archived=1" {{if .Archived}}class="active"{{end}}>Archive</a>
       </nav>
     </div>

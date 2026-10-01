@@ -1,6 +1,6 @@
 {{define "detail"}}
 <div class="page-heading">
-  <p class="eyebrow"><a href="/assets{{if .Asset.Archived}}?archived=1{{end}}">Back to {{if .Asset.Archived}}Archive{{else}}Collection{{end}}</a> <span class="heading-divider">/</span> {{.Asset.Label}}</p>
+  <p class="eyebrow"><a href="/assets{{if .Asset.Archived}}?archived=1{{end}}">Back to {{if .Asset.Archived}}Archive{{else}}Assets{{end}}</a> <span class="heading-divider">/</span> {{.Asset.Label}}</p>
   <h1>{{.Asset.Title}}</h1>
   {{if .Asset.Archived}}<p class="archive-status">Archived entry</p>{{end}}
 </div>
@@ -30,6 +30,6 @@
 {{if .Original}}<details class="original-intake panel"><summary>Original intake</summary><p class="muted">Original values retained from initial entry.</p><dl>{{if .Original.ShortDescription}}<dt>Short description</dt><dd>{{.Original.ShortDescription}}</dd><dt>Details</dt><dd class="description">{{.Original.Details}}</dd>{{else}}<dt>Description</dt><dd class="description">{{.Original.Description}}</dd>{{end}}<dt>Location</dt><dd>{{.Original.Location}}</dd></dl></details>{{end}}
 <form method="post" action="/assets/{{.Asset.ID}}/archive" class="archive-action">
   <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="revision" value="{{.Asset.Revision}}">
-  {{if .Asset.Archived}}<input type="hidden" name="archived" value="0"><button type="submit" class="button">Restore to collection</button>{{else}}<input type="hidden" name="archived" value="1"><button type="submit" class="text-button">Archive entry</button> <span class="muted">Preserves the record and photos for later restoration.</span>{{end}}
+  {{if .Asset.Archived}}<input type="hidden" name="archived" value="0"><button type="submit" class="button">Restore to Assets</button>{{else}}<input type="hidden" name="archived" value="1"><button type="submit" class="text-button">Archive entry</button> <span class="muted">Preserves the record and photos for later restoration.</span>{{end}}
 </form>
 {{end}}

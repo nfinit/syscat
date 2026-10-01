@@ -362,7 +362,7 @@ func (a *App) detail(w http.ResponseWriter, r *http.Request) {
 		p.Notice = "Changes saved."
 	}
 	if r.URL.Query().Get("restored") == "1" {
-		p.Notice = "Entry restored to the collection."
+		p.Notice = "Entry restored to Assets."
 	}
 	if c.Archived {
 		a.render(w, http.StatusOK, p)
@@ -550,7 +550,7 @@ func (a *App) list(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, err)
 		return
 	}
-	p := page{Page: "list", Title: "Collection", Assets: assets, Query: query, Count: count, Archived: archived}
+	p := page{Page: "list", Title: "Assets", Assets: assets, Query: query, Count: count, Archived: archived}
 	if archived {
 		p.Title = "Archive"
 	}

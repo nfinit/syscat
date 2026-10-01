@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Rename the Collection tab and listing to Assets, align return/restore/export
+  labels, and use an asset-neutral short-description prompt in intake and edit forms.
+
 ## 1.7.0 - 2026-10-01
 
 - Split descriptions into required single-line short descriptions and optional
