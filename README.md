@@ -136,8 +136,10 @@ schema migrations and rejects unsupported newer schemas.
 
 A JSON API provides paginated search, records with original intake, and photo URLs.
 PATCH endpoints edit current descriptions, locations, captions, and groups using
-asset revision checks and stable photo IDs. Access currently uses the trusted
-network without credentials or browser sessions; write routes share a policy
+asset revision checks and stable photo IDs. Multipart POST creates new records
+with original intake or attaches photos to existing records, using the shared
+image privacy and thumbnail pipeline. Creation supports persistent retry keys.
+Access currently uses the trusted network without credentials or browser sessions; write routes share a policy
 that can enforce authentication later.
 
 ```sh
@@ -171,5 +173,5 @@ record revisions are independent. Release tags use `vMAJOR.MINOR.PATCH`; see
 Core flows use server-rendered HTML and ordinary forms; JavaScript is optional.
 The inherited browser target is approximately 2015-2016 desktop browsers and
 current phones. Actual legacy browser compatibility and physical phone camera
-behavior still need testing. API writes, system/component profiles, relationships,
+behavior still need testing. System/component profiles, relationships,
 multi-user support, and broader browser support are future work.

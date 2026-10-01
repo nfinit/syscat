@@ -8,16 +8,18 @@ it is accessible to anyone who can reach this trusted-network server.
 | --- | --- |
 | `GET /api` | API discovery index (`/api/` is also supported) |
 | `GET /api/assets` | Paginated listing and search |
+| `POST /api/assets` | Create a record with overview and optional detail photos |
 | `GET /api/assets/{id}` | Full current record and original intake |
 | `PATCH /api/assets/{id}` | Update current description or location |
 | `PATCH /api/assets/{id}/photos/{photo_id}` | Update a current photo caption or group |
+| `POST /api/assets/{id}/photos` | Attach one or more photos to an existing asset |
 | `GET /api/openapi.json` | Embedded OpenAPI 3.0.3 description |
 
-Read endpoints support GET and HEAD; the two edit endpoints support PATCH.
+Read endpoints support GET and HEAD; text edits use PATCH and photo uploads use POST.
 Unsupported methods return HTTP 405 with the endpoint’s allowed methods. Unknown
 API endpoints return HTTP 404. Responses and errors are JSON with
-`Cache-Control: no-store`. API calls do not create sessions. Creation, uploads,
-photo deletion/ordering, and archive operations remain web-interface features.
+`Cache-Control: no-store`. API calls do not create sessions. Photo deletion/ordering and archive operations
+remain web-interface features.
 
 ## Discovery
 
@@ -111,7 +113,8 @@ curl http://127.0.0.1:8800/api/assets/00001
 Each record contains numeric `id`, display `label`, a short `title`, the full
 `description`, `location`, ordered `photos`, `created_at`, `updated_at`,
 `revision`, and `archived`. It also provides `url` for the HTML entry and
-`api_url` for its JSON representation. Individual records include
+`api_url` for its JSON representation, plus `photo_upload_url` for attaching photos.
+Individual records include
 `original_intake`, the stored initial snapshot. Archived records are readable
 by ID. An invalid ID returns 400; an ID with no record returns 404.
 
@@ -126,7 +129,7 @@ Each current photo provides:
 - `caption`: optional descriptive text, or an empty string when absent (up to 1,000 characters).
 - `role`: `overview` for the first current photo, `detail` for subsequent photos.
   Photos follow the saved display order. The first photo is the overview.
-- `original_url`: the original image, retained byte-for-byte.
+- `original_url`: the uploaded image with location-capable metadata removed, without recompressing image data.
 - `thumbnail_url`: the orientation-corrected JPEG display image.
 
 URLs begin with `/` and should be resolved against the server origin used for
@@ -149,10 +152,11 @@ Other original-intake fields remain unchanged.
 
 Writes currently use trusted-network access without credentials. All write routes
 pass through a shared authorization policy so authentication can be added later.
-Browser form sessions and CSRF handling are independent of these JSON endpoints.
+Browser form sessions and CSRF handling are independent of these API endpoints.
 
 Read the asset first and include its current positive integer `revision` in every
-PATCH. Each successful write returns the full updated asset, including its new
+PATCH or attachment upload. Creation allocates a new record at revision 1 and
+does not accept a revision. Each successful write returns the full updated asset, including its new
 revision and original intake. A concurrent or stale edit returns HTTP 409 with
 `error.code: "conflict"`; reread the asset and reconcile before retrying. Archived
 entries cannot be edited through the API; restore them in the web interface first.
@@ -188,6 +192,101 @@ to 128 KiB, with revision and at least one editable field. Null values, unknown 
 duplicate fields, invalid types, and query parameters are rejected. Limits match
 the web form: description 20,000 UTF-8 bytes, location 500 UTF-8 bytes, caption
 1,000 characters, and single-line group names 100 characters.
+
+## Creating records
+
+POST multipart form data to `/api/assets`, with a nonempty `description` and
+exactly one `overview` file. `location`, `caption_overview`, and any number of
+`photos` detail files are optional. Description is trimmed and limited to 20,000
+UTF-8 bytes, with its first line supplying the title; location is trimmed and
+limited to 500 UTF-8 bytes. Both scalar fields must appear at most once.
+The overview is always ungrouped. Detail `caption_photos` and `group_photos`
+follow the same file-order/count rules as attachment uploads below. Captions
+are limited to 1,000 characters and single-line groups to 100 characters.
+
+```sh
+curl http://127.0.0.1:8800/api/assets \
+  -H 'Idempotency-Key: recycler-intake-2026-09-30-example' \
+  --form-string 'description=Unidentified desktop system' \
+  --form-string 'location=Workbench' \
+  -F 'overview=@system.jpg' \
+  --form-string 'caption_overview=As acquired' \
+  -F 'photos=@motherboard.jpg' \
+  --form-string 'caption_photos=Motherboard markings' \
+  --form-string 'group_photos=Interior'
+```
+
+Creation uses the same image formats, metadata stripping, thumbnails, and upload
+limits as attachments. HTTP 201 returns the full asset with its permanent ID,
+photo IDs/links, revision 1, and `original_intake`. The `Location` header points
+to the new full-record endpoint. All submitted observations and the initial
+photo collection are captured in intake, just as with browser intake. Subsequent
+PATCHes and uploads can use the returned revision and links immediately.
+A failed creation leaves no record or generated images.
+
+Use an `Idempotency-Key` when retrying may be necessary. It is optional,
+case-sensitive, and must appear once with 1–128 ASCII letters, digits, dots,
+underscores, or hyphens. Generate a unique key for each logical intake and retain
+it for retries. The first successful creation owns that key permanently, even
+across restarts or archiving. Replaying a valid multipart creation request with
+the same key returns HTTP 200 and that record's **current** state, preserving all
+later edits and original intake, without creating more records or images.
+Replacement content is ignored after basic request validation; replay is not an
+update operation. Use a fresh key to create a different system. Failed requests
+do not reserve their key. Without a key, every successful request creates a new
+record, including repeated requests with identical content.
+
+Unknown fields, duplicated scalar fields, query parameters, and invalid intake
+return HTTP 400. Creation does not accept `id`, `revision`, archive state, intake,
+or image paths. The server assigns those values. Authorization passes through
+the shared API write policy before parsing the request.
+
+## Attaching photos
+
+Follow the full record's `photo_upload_url`, or POST to `/api/assets/{id}/photos`.
+Use `multipart/form-data` with file bytes rather than base64 or remote image URLs:
+
+```sh
+curl http://127.0.0.1:8800/api/assets/1/photos \
+  -F 'revision=9' \
+  -F 'photos=@exterior.jpg' \
+  -F 'photos=@motherboard.jpg' \
+  --form-string 'caption_photos=Rear connectors' \
+  --form-string 'caption_photos=Motherboard overview' \
+  --form-string 'group_photos=Exterior' \
+  --form-string 'group_photos=Interior'
+```
+
+Replace the example revision with the current asset revision. `revision` must
+appear exactly once, and at least one `photos` file is required. For multiple
+files, repeat `photos`; its multipart order defines the uploaded file order.
+`caption_photos` and `group_photos` are each optional: omit the field entirely,
+or provide exactly one value per file in the same order, using empty strings for
+missing values. Captions and groups use the same trimming and limits as PATCH.
+Unknown fields, misplaced file parts, repeated revisions, mismatched metadata
+counts, and query parameters return HTTP 400.
+
+Files use the same pipeline as browser uploads: JPEG, PNG, or GIF; at most
+12 MiB per photo and 32 megapixels; total request size limited by
+`--max-upload-mib` (256 MiB by default). Location-capable metadata is stripped,
+JPEG orientation retained, and display thumbnails generated. Oversized files or
+requests return HTTP 413; unsupported/invalid images return HTTP 400; an incorrect
+request media type returns HTTP 415.
+
+A successful batch returns HTTP 201, a `Location` header pointing to the full
+record, and the full updated asset including stable photo IDs and its new
+revision. Photos append within their groups, keeping the existing overview and
+named group order; new named groups follow in upload order, with ungrouped details
+last. For a legacy record without photos, the first attachment becomes the
+overview and must have an empty group. Existing descriptions, locations, and
+original intake remain unchanged. Later attachments are not original intake.
+
+The batch saves as one revision. Invalid files or a failed save reject the whole
+batch and remove its generated originals and thumbnails. Concurrent edits or
+archived records return HTTP 409. If a response is lost, reread the asset and
+check which photos were attached before retrying; do not blindly repeat an upload
+with a newer revision, which would attach duplicates. Authentication can gate
+this route through the same write policy used for PATCH.
 
 ## Errors
 

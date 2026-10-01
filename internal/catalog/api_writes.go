@@ -161,7 +161,7 @@ func (a *App) apiWriteAsset(w http.ResponseWriter, r *http.Request, revision int
 	return c, true
 }
 
-func (a *App) apiSaveEdits(w http.ResponseWriter, c Asset) {
+func (a *App) apiCommitEdits(w http.ResponseWriter, c Asset) bool {
 	if err := a.saveAssetEdits(c, nil); err != nil {
 		switch {
 		case errors.Is(err, ErrConflict):
@@ -171,14 +171,24 @@ func (a *App) apiSaveEdits(w http.ResponseWriter, c Asset) {
 		default:
 			apiFailure(w, err)
 		}
-		return
+		return false
 	}
-	saved, err := a.store.Get(c.ID)
+	return true
+}
+
+func (a *App) apiSaveEdits(w http.ResponseWriter, c Asset) {
+	if a.apiCommitEdits(w, c) {
+		a.apiEditedAsset(w, c.ID, http.StatusOK)
+	}
+}
+
+func (a *App) apiEditedAsset(w http.ResponseWriter, id int64, status int) {
+	saved, err := a.store.Get(id)
 	if err != nil {
 		apiFailure(w, err)
 		return
 	}
-	apiJSON(w, http.StatusOK, asAPIAsset(saved))
+	apiJSON(w, status, asAPIAsset(saved))
 }
 
 func (a *App) apiPatchAsset(w http.ResponseWriter, r *http.Request) {

@@ -183,6 +183,10 @@ func TestAPIRejectsInvalidRequestsAndUnsupportedMethods(t *testing.T) {
 	for _, method := range []string{"POST", "PUT", "PATCH", "DELETE", "OPTIONS"} {
 		for _, path := range []string{"/api", "/api/", "/api/assets", "/api/assets/1", "/api/openapi.json"} {
 			result := b.request(method, path, "application/json", strings.NewReader(`{"description":"Overwrite attempt"}`))
+			if method == "POST" && path == "/api/assets" {
+				expect(t, result, 415)
+				continue
+			}
 			if method == "PATCH" && path == "/api/assets/1" {
 				expect(t, result, 400)
 				continue
@@ -190,7 +194,11 @@ func TestAPIRejectsInvalidRequestsAndUnsupportedMethods(t *testing.T) {
 			expect(t, result, http.StatusMethodNotAllowed)
 			var response apiErrorResponse
 			readAPI(t, result, &response)
-			if response.Error.Code != "method_not_allowed" || result.Header().Get("Allow") != map[bool]string{true: "GET, HEAD, PATCH", false: "GET, HEAD"}[path == "/api/assets/1"] {
+			allow := map[string]string{"/api/assets": "GET, HEAD, POST", "/api/assets/1": "GET, HEAD, PATCH"}[path]
+			if allow == "" {
+				allow = "GET, HEAD"
+			}
+			if response.Error.Code != "method_not_allowed" || result.Header().Get("Allow") != allow {
 				t.Fatalf("incorrect method response: %+v", response)
 			}
 		}

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 1.6.3 - 2026-09-30
+
+- Add multipart API record creation with required description/overview, optional
+  location and captioned/grouped detail photos, original-intake capture, and
+  persistent optional idempotency keys to prevent duplicate intake on retries.
+- Add revision-checked multipart API photo uploads with optional captions and
+  groups, shared image privacy/thumbnail processing, batch cleanup on failure,
+  and full-record upload links. Use the shared API write authorization policy.
+
 ## 1.6.2 - 2026-09-30
 
 - Add explicit API search fields for titles, descriptions, locations, photo

@@ -30,19 +30,20 @@ type apiPhoto struct {
 }
 
 type apiAsset struct {
-	ID          int64           `json:"id"`
-	Label       string          `json:"label"`
-	Title       string          `json:"title"`
-	Description string          `json:"description"`
-	Location    string          `json:"location"`
-	Photos      []apiPhoto      `json:"photos"`
-	CreatedAt   string          `json:"created_at"`
-	UpdatedAt   string          `json:"updated_at"`
-	Revision    int             `json:"revision"`
-	Archived    bool            `json:"archived"`
-	URL         string          `json:"url"`
-	APIURL      string          `json:"api_url"`
-	Intake      json.RawMessage `json:"original_intake,omitempty"`
+	ID             int64           `json:"id"`
+	Label          string          `json:"label"`
+	Title          string          `json:"title"`
+	Description    string          `json:"description"`
+	Location       string          `json:"location"`
+	Photos         []apiPhoto      `json:"photos"`
+	CreatedAt      string          `json:"created_at"`
+	UpdatedAt      string          `json:"updated_at"`
+	Revision       int             `json:"revision"`
+	Archived       bool            `json:"archived"`
+	URL            string          `json:"url"`
+	APIURL         string          `json:"api_url"`
+	PhotoUploadURL string          `json:"photo_upload_url"`
+	Intake         json.RawMessage `json:"original_intake,omitempty"`
 }
 
 type apiAssetList struct {
@@ -102,6 +103,7 @@ func asAPIAsset(c Asset) apiAsset {
 		CreatedAt: c.CreatedAt, UpdatedAt: c.UpdatedAt, Revision: c.Revision,
 		Archived: c.Archived, URL: fmt.Sprintf("/assets/%d", c.ID),
 		APIURL: fmt.Sprintf("/api/assets/%d", c.ID), Intake: c.Intake,
+		PhotoUploadURL: fmt.Sprintf("/api/assets/%d/photos", c.ID),
 	}
 }
 
@@ -294,8 +296,14 @@ func (a *App) apiSpec(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) apiMethodNotAllowed(w http.ResponseWriter, r *http.Request) {
 	allow := "GET, HEAD"
+	if r.Pattern == "/api/assets" {
+		allow = "GET, HEAD, POST"
+	}
 	if r.Pattern == "/api/assets/{id}" {
 		allow = "GET, HEAD, PATCH"
+	}
+	if r.Pattern == "/api/assets/{id}/photos" {
+		allow = "POST"
 	}
 	if r.Pattern == "/api/assets/{id}/photos/{photo_id}" {
 		allow = "PATCH"

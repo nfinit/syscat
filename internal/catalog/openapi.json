@@ -3,7 +3,7 @@
   "info": {
     "title": "Syscat inventory API",
     "version": "1",
-    "description": "Search inventory, read records and photographs, and PATCH current descriptions, locations, captions, and groups. Writes currently use trusted-network access without authentication, cookies, or CSRF tokens. Every write requires the current asset revision. URLs are root-relative."
+    "description": "Create and search inventory, read records and photographs, attach photos, and PATCH current descriptions, locations, captions, and groups. Writes currently use trusted-network access without authentication, cookies, or CSRF tokens. Edits and attachments require the current asset revision; creation starts a new record at revision 1. URLs are root-relative."
   },
   "servers": [
     {
@@ -146,6 +146,131 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createAsset",
+        "summary": "Create an asset with original intake and photos",
+        "description": "Trusted-network multipart creation without cookies or CSRF tokens. Requires a description and exactly one overview photo. Location, overview caption, detail photos, detail captions, and groups are optional. Uses the shared image metadata stripping/thumbnail pipeline and captures original intake. Returns revision 1. Optional Idempotency-Key identifies a logical creation: first successful creation wins; replay returns that record in its current state with 200, ignoring replacement content after basic request validation. Keys persist across restarts and archiving. Use a new key for each different creation. Without a key, every successful request creates a new asset. A failed creation does not reserve a key. Unknown fields and query parameters are rejected.",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Optional persistent retry key. 1\u2013128 ASCII letters, digits, dots, underscores, or hyphens. Must appear once; case sensitive. Do not reuse for another logical creation.",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/AssetCreate"
+              },
+              "encoding": {
+                "photos": {
+                  "contentType": "image/jpeg, image/png, image/gif"
+                },
+                "caption_photos": {
+                  "style": "form",
+                  "explode": true
+                },
+                "group_photos": {
+                  "style": "form",
+                  "explode": true
+                },
+                "overview": {
+                  "contentType": "image/jpeg, image/png, image/gif"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created asset including permanent inventory ID, stable photo IDs/links, original intake, and revision 1.",
+            "headers": {
+              "Location": {
+                "description": "Root-relative URL of the updated asset.",
+                "schema": {
+                  "type": "string",
+                  "format": "uri-reference"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing description/overview, malformed multipart request, invalid idempotency key or metadata, unknown/duplicate fields, or invalid image.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request exceeds configured max-upload-mib (default 256 MiB), or a photo exceeds 12 MiB.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Use multipart/form-data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Idempotent replay: current record created by this key, including later edits or archived status. No duplicate images or records.",
+            "headers": {
+              "Location": {
+                "description": "Root-relative URL of the updated asset.",
+                "schema": {
+                  "type": "string",
+                  "format": "uri-reference"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetDetail"
                 }
               }
             }
@@ -496,6 +621,129 @@
           }
         }
       }
+    },
+    "/api/assets/{id}/photos": {
+      "post": {
+        "operationId": "uploadAssetPhotos",
+        "summary": "Attach photos to an existing asset",
+        "description": "Trusted-network multipart upload without cookies or CSRF tokens. Requires the current asset revision. One or more photos are saved as one revision, with optional captions and groups aligned by file order. Preserves existing overview, metadata, and original intake. Reuses image validation, metadata stripping, and thumbnail generation. On any failure the entire batch is rejected and its generated files removed. Concurrent changes return 409; reread and reconcile before retrying. No query parameters accepted.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/PhotoUpload"
+              },
+              "encoding": {
+                "photos": {
+                  "contentType": "image/jpeg, image/png, image/gif"
+                },
+                "caption_photos": {
+                  "style": "form",
+                  "explode": true
+                },
+                "group_photos": {
+                  "style": "form",
+                  "explode": true
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Full updated asset with stable photo IDs and new revision. New files are assigned detail roles; the existing overview is retained. For a legacy asset with no photos, its first attachment becomes the ungrouped overview.",
+            "headers": {
+              "Location": {
+                "description": "Root-relative URL of the updated asset.",
+                "schema": {
+                  "type": "string",
+                  "format": "uri-reference"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed multipart request, missing or invalid revision, invalid metadata, or unsupported/invalid image.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Asset not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale revision or archived asset.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request exceeds configured max-upload-mib (default 256 MiB), or a photo exceeds 12 MiB.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Use multipart/form-data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -568,7 +816,8 @@
           "revision",
           "archived",
           "url",
-          "api_url"
+          "api_url",
+          "photo_upload_url"
         ],
         "properties": {
           "id": {
@@ -625,6 +874,11 @@
             "type": "object",
             "additionalProperties": true,
             "description": "Stored initial snapshot, only included on individual records. Photo paths are relative to the server root. The snapshot ID may be 0 because it predates ID allocation; use the outer record ID."
+          },
+          "photo_upload_url": {
+            "type": "string",
+            "format": "uri-reference",
+            "description": "Root-relative multipart POST endpoint for attaching photos to this asset."
           }
         }
       },
@@ -964,6 +1218,99 @@
           }
         },
         "description": "Summary projection of a listing; pagination links retain view=summary and other filters."
+      },
+      "PhotoUpload": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "revision",
+          "photos"
+        ],
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Exactly one current asset revision."
+          },
+          "photos": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "format": "binary"
+            },
+            "description": "Repeat this file part for multiple photos. JPEG, PNG, GIF only. Each photo at most 12 MiB and 32 megapixels. Total request at most max-upload-mib (256 MiB by default)."
+          },
+          "caption_photos": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "description": "Omit entirely, or repeat once per photo in photos file order. Use empty strings for uncaptioned files. Text is trimmed."
+          },
+          "group_photos": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "description": "Omit entirely, or repeat once per photo in photos file order. Use empty strings for ungrouped files. Trimmed, single-line names. Existing named group order retained, new groups follow in encounter order, ungrouped details last."
+          }
+        }
+      },
+      "AssetCreate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "description",
+          "overview"
+        ],
+        "properties": {
+          "photos": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "binary"
+            },
+            "description": "Optional detail photos. Repeat photos for multiple files. JPEG/PNG/GIF only; at most 12 MiB and 32 megapixels each. Total request at most max-upload-mib (default 256 MiB)."
+          },
+          "caption_photos": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "description": "Omit entirely, or repeat once per photo in photos file order. Use empty strings for uncaptioned files. Text is trimmed."
+          },
+          "group_photos": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "description": "Omit entirely, or repeat once per photo in photos file order. Use empty strings for ungrouped files. Trimmed, single-line names. Existing named group order retained, new groups follow in encounter order, ungrouped details last."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Required nonempty trimmed description, at most 20,000 UTF-8 bytes. First line supplies the display title; subsequent lines hold detailed observations."
+          },
+          "location": {
+            "type": "string",
+            "description": "Optional trimmed location, at most 500 UTF-8 bytes."
+          },
+          "overview": {
+            "type": "string",
+            "format": "binary",
+            "description": "Exactly one required overview photo, separate from detail photos; always ungrouped. Same format, size, and metadata handling as photos."
+          },
+          "caption_overview": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "Optional trimmed caption for the overview; submit at most once."
+          }
+        }
       }
     }
   }
