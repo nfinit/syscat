@@ -49,6 +49,7 @@
             while (field.firstChild) { editor.appendChild(field.firstChild); }
             field.appendChild(editor);
         }
+        if (window.SyscatExistingValues) { window.SyscatExistingValues.enhanceGroup(input); }
         editor.id = input.id + "-editor";
         var button = document.createElement("button");
         button.type = "button";
@@ -68,6 +69,8 @@
         input.addEventListener("keydown", function (event) {
             if (event.isComposing || event.keyCode === 229) { return; }
             if (event.key === "Enter" || event.keyCode === 13) {
+                // Let the suggestion widget accept an explicitly highlighted group.
+                if (event.defaultPrevented || (input.getAttribute("aria-expanded") === "true" && input.getAttribute("aria-activedescendant"))) { return; }
                 event.preventDefault();
                 expanded = false;
                 toggle();

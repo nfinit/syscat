@@ -59,7 +59,6 @@
                     input.name = "group_" + photo.getAttribute("data-photo");
                     input.id = photo.querySelector(".caption-editor input").id + "-group";
                     input.maxLength = 100;
-                    input.setAttribute("list", "photo-group-names");
                     label.htmlFor = input.id;
                     label.textContent = "Group (optional)";
                     field.appendChild(label);
@@ -70,29 +69,11 @@
                 }
                 return field;
             }
-            function updateGroupSuggestions() {
-                var suggestions = form.querySelector("#photo-group-names");
-                if (!suggestions) { return; }
-                suggestions.textContent = "";
-                var names = [], sections = namedSections();
-                for (var j = 0; j < sections.length; j++) { names.push(sections[j].getAttribute("data-group")); }
-                var inputs = gallery.querySelectorAll(".photo-group-field input");
-                for (var k = 0; k < inputs.length; k++) { names.push(inputs[k].value.replace(/^\s+|\s+$/g, "")); }
-                var seen = [];
-                for (var n = 0; n < names.length; n++) {
-                    if (!names[n] || seen.indexOf(names[n]) !== -1) { continue; }
-                    seen.push(names[n]);
-                    var option = document.createElement("option");
-                    option.value = names[n];
-                    suggestions.appendChild(option);
-                }
-            }
             function wireGroupInput(input) {
                 input.addEventListener("change", function () {
                     if (rearranging) { return; }
                     // Keep the editing layout stable. Saving applies group changes.
                     input.value = input.value.replace(/^\s+|\s+$/g, "");
-                    updateGroupSuggestions();
                 });
             }
             function refresh() {
@@ -106,7 +87,6 @@
                     names[n].querySelector(".move-group-up").disabled = n === 0;
                     names[n].querySelector(".move-group-down").disabled = n === names.length - 1;
                 }
-                updateGroupSuggestions();
                 sections = gallery.querySelectorAll(".photo-group");
                 var position = 1;
                 for (var s = 0; s < sections.length; s++) {

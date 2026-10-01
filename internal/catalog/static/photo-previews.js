@@ -143,7 +143,6 @@
                         groupInput.name = "group_" + input.name;
                         groupInput.id = caption.id + "-group";
                         groupInput.maxLength = 100;
-                        groupInput.setAttribute("list", "photo-group-names");
                         groupLabel.htmlFor = groupInput.id;
                         groupLabel.textContent = "Group (optional)";
                         groupField.appendChild(groupLabel);

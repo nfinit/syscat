@@ -38,12 +38,9 @@ small { display: block; font-size: 11px; color: #7d887b; margin-top: 6px; line-h
 .field-pair { font-size: 0; }
 .field-pair .field { display: inline-block; vertical-align: top; width: 50%; font-size: 15px; padding-right: 10px; }
 .field-pair .field + .field { padding-right: 0; padding-left: 10px; }
-.existing-picker { display: none; margin-top: 7px; font-size: 12px; }
-.existing-picker summary { font-size: 12px; }
-.existing-picker label { margin-top: 10px; font-size: 11px; }
-.existing-picker select { display: inline-block; vertical-align: middle; width: 65%; max-width: 100%; min-height: 43px; padding: 8px; border: 1px solid #d4dacd; border-radius: 4px; background: #fff; color: #263a35; font: inherit; }
-.existing-picker .button { margin-left: 4px; padding-left: 12px; padding-right: 12px; }
-.existing-picker select:focus { outline: 3px solid #ad7727; outline-offset: 3px; }
+.value-suggestions { display: none; list-style: none; margin: 7px 0 0; padding: 4px; max-height: 220px; overflow-y: auto; border: 1px solid #d4dacd; border-radius: 4px; background: #fff; }
+.value-suggestions li { padding: 10px 8px; cursor: pointer; overflow-wrap: break-word; }
+.value-suggestions li:hover, .value-suggestions li[aria-selected="true"] { background: #edf1e7; color: #183c31; }
 .check { font-size: 12px; font-weight: normal; color: #6f7d6f; margin-top: -3px; margin-bottom: 22px; cursor: pointer; }
 .check input { vertical-align: middle; margin: 0 7px 2px 0; width: 16px; height: 16px; }
 .description-field { margin-bottom: 25px; }
@@ -146,7 +143,6 @@ summary { cursor: pointer; color: #617756; padding: 4px 0; }
  .detail-info { padding: 24px; }
  .site-footer { margin-left: 20px; margin-right: 20px; font-size: 10px; }
  input[type="text"], input[type="search"], textarea { font-size: 16px; }
- .existing-picker select { font-size: 16px; }
  .record-summary { margin-left: 103px; margin-right: 0; }
  .record-photo { width: 85px; height: 85px; }
  .record-open { display: none; }

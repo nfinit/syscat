@@ -19,7 +19,6 @@
     <div class="section-label"><span class="step">01</span> PHOTOS</div>
     {{if .Asset.Photos}}
     <noscript><small>Use each photo position once and each group position once. Select a photo to set the overview.</small></noscript>
-    <datalist id="photo-group-names">{{range .Asset.PhotoSections}}{{if .Name}}<option value="{{.Name}}">{{end}}{{end}}</datalist>
     <div class="existing-photos" data-photo-asset="{{.Asset.ID}}">
       {{range $section := .Asset.PhotoSections}}<section class="photo-group" data-group="{{.Name}}" {{if .Overview}}data-overview="true"{{end}}>
         <h3 class="photo-group-heading">{{.Title}}</h3>
@@ -36,7 +35,7 @@
               <input type="text" id="caption-{{.Position}}" name="caption_{{.Path}}" value="{{.Caption}}" maxlength="1000">
             </div>
             {{if not $section.Overview}}<div class="photo-group-field">
-              <div class="group-editor"><label for="group-{{.Position}}">Group <span class="optional">Optional</span></label><input type="text" id="group-{{.Position}}" name="group_{{.Path}}" value="{{.Group}}" maxlength="100" list="photo-group-names"></div>
+              <div class="group-editor"><label for="group-{{.Position}}">Group <span class="optional">Optional</span></label><input type="text" id="group-{{.Position}}" name="group_{{.Path}}" value="{{.Group}}" maxlength="100" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></div>
             </div>{{end}}
           </div>{{end}}
         </div>
@@ -55,12 +54,9 @@
     <label for="location">Location <span class="optional">Optional</span></label>
     <input type="text" id="location" name="location" value="{{.Asset.Location}}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" maxlength="500" placeholder="Workshop / shelf B / bin 12" aria-describedby="location-help">
     <small id="location-help">{{if .Asset.ID}}Physical storage location.{{else}}Retained for subsequent entries in this session.{{end}}</small>
-    {{if .Locations}}<details class="existing-picker" data-field="location">
-      <summary tabindex="-1">Choose an existing location</summary>
-      <label for="existing-location">Previous locations</label>
-      <select id="existing-location" tabindex="-1"><option value="">Choose a location...</option>{{range .Locations}}<option value="{{.}}">{{.}}</option>{{end}}</select>
-      <button type="button" class="button" tabindex="-1">Use</button>
-    </details>{{end}}
+    {{if .Locations}}<ul id="location-suggestions" class="value-suggestions" data-field="location" role="listbox" aria-label="Existing locations">
+      {{range .Locations}}<li role="option" aria-selected="false">{{.}}</li>{{end}}
+    </ul>{{end}}
   </div>
   <div class="field">
     <label for="short-description">Short description <span class="required">Required</span></label>

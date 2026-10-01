@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.7.1 - 2026-10-01
+
+- Replace the Location selector with filtered in-page suggestions that preserve
+  textbox focus and typed values until an existing location is explicitly chosen.
+  Apply the same suggestions to existing and newly uploaded photo group editors,
+  including unsaved group names. Without JavaScript, fields remain plain text inputs.
 - Rename the Collection tab and listing to Assets, align return/restore/export
   labels, and use an asset-neutral short-description prompt in intake and edit forms.
 
