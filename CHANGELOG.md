@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Neutralize the dark page background to charcoal and soften blue tones in text,
+  borders, and secondary surfaces, retaining subtle blue-gray forms and blue accents.
+
 ## 1.7.2 - 2026-10-01
 
 - Add a JavaScript-enabled footer dark-mode toggle with a saved browser choice,
