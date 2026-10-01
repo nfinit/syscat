@@ -25,6 +25,7 @@
     {{if eq .Page "form"}}{{template "form" .}}{{end}}
     {{if eq .Page "list"}}{{template "list" .}}{{end}}
     {{if eq .Page "detail"}}{{template "detail" .}}{{end}}
+    {{if eq .Page "number"}}{{template "number" .}}{{end}}
   </main>
   <footer class="site-footer"><span>{{.Build}}</span><a href="/api">API</a></footer>
   <script src="/static/photo-groups.js" defer></script>

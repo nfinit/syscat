@@ -59,6 +59,9 @@ type page struct {
 	Saved                                               *Asset
 	DeletedPhotos                                       map[string]bool
 	Previous, Next                                      string
+	NumberTarget                                        int64
+	NumberOther                                         *Asset
+	NumberPreview                                       bool
 }
 
 func New(dir string) (*App, error) {
@@ -97,6 +100,8 @@ func NewWithUploadLimit(dir string, maxUploadMiB int64) (*App, error) {
 	mux.HandleFunc("POST /assets", a.create)
 	mux.HandleFunc("GET /assets/{id}", a.detail)
 	mux.HandleFunc("GET /assets/{id}/edit", a.edit)
+	mux.HandleFunc("GET /assets/{id}/catalog-number", a.numberEditor)
+	mux.HandleFunc("POST /assets/{id}/catalog-number", a.numberChange)
 	mux.HandleFunc("POST /assets/{id}", a.update)
 	mux.HandleFunc("POST /assets/{id}/archive", a.archive)
 	mux.HandleFunc("GET /export/{format}", a.export)
@@ -106,6 +111,8 @@ func NewWithUploadLimit(dir string, maxUploadMiB int64) (*App, error) {
 	mux.HandleFunc("GET /api/assets/{id}", a.apiDetail)
 	mux.HandleFunc("PATCH /api/assets/{id}", a.apiWrite(a.apiPatchAsset))
 	mux.HandleFunc("/api/assets/{id}", a.apiMethodNotAllowed)
+	mux.HandleFunc("POST /api/assets/{id}/catalog-number", a.apiWrite(a.apiNumberChange))
+	mux.HandleFunc("/api/assets/{id}/catalog-number", a.apiMethodNotAllowed)
 	mux.HandleFunc("POST /api/assets/{id}/photos", a.apiWrite(a.apiUploadPhotos))
 	mux.HandleFunc("/api/assets/{id}/photos", a.apiMethodNotAllowed)
 	mux.HandleFunc("PATCH /api/assets/{id}/photos/{photo_id}", a.apiWrite(a.apiPatchPhoto))
@@ -376,6 +383,7 @@ func (a *App) update(w http.ResponseWriter, r *http.Request) {
 	err := a.parsePost(w, r, s)
 	defer cleanupForm(r)
 	c := submitted(r)
+	c.CatalogNumber = current.CatalogNumber
 	c.ID, c.Photos = current.ID, append([]Photo(nil), current.Photos...)
 	if err == nil {
 		err = submittedCaptions(r.PostForm, c.Photos)
@@ -560,13 +568,13 @@ func (a *App) export(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	out := csv.NewWriter(w)
-	_ = out.Write([]string{"id", "label", "description", "location", "photos", "created_at", "updated_at", "archived"})
+	_ = out.Write([]string{"id", "label", "description", "location", "photos", "created_at", "updated_at", "archived", "catalog_number"})
 	for _, c := range assets {
 		paths := []string{}
 		for _, p := range c.Photos {
 			paths = append(paths, p.Path)
 		}
-		row := []string{strconv.FormatInt(c.ID, 10), c.Label(), c.Description, c.Location, strings.Join(paths, ";"), c.CreatedAt, c.UpdatedAt, strconv.FormatBool(c.Archived)}
+		row := []string{strconv.FormatInt(c.ID, 10), c.Label(), c.Description, c.Location, strings.Join(paths, ";"), c.CreatedAt, c.UpdatedAt, strconv.FormatBool(c.Archived), strconv.FormatInt(c.CatalogNumber, 10)}
 		// Keep spreadsheet programs from interpreting freeform observations as formulas.
 		for i, value := range row {
 			trimmed := strings.TrimLeft(value, " \t\r\n")

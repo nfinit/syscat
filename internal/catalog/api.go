@@ -30,20 +30,22 @@ type apiPhoto struct {
 }
 
 type apiAsset struct {
-	ID             int64           `json:"id"`
-	Label          string          `json:"label"`
-	Title          string          `json:"title"`
-	Description    string          `json:"description"`
-	Location       string          `json:"location"`
-	Photos         []apiPhoto      `json:"photos"`
-	CreatedAt      string          `json:"created_at"`
-	UpdatedAt      string          `json:"updated_at"`
-	Revision       int             `json:"revision"`
-	Archived       bool            `json:"archived"`
-	URL            string          `json:"url"`
-	APIURL         string          `json:"api_url"`
-	PhotoUploadURL string          `json:"photo_upload_url"`
-	Intake         json.RawMessage `json:"original_intake,omitempty"`
+	ID               int64           `json:"id"`
+	CatalogNumber    int64           `json:"catalog_number"`
+	Label            string          `json:"label"`
+	Title            string          `json:"title"`
+	Description      string          `json:"description"`
+	Location         string          `json:"location"`
+	Photos           []apiPhoto      `json:"photos"`
+	CreatedAt        string          `json:"created_at"`
+	UpdatedAt        string          `json:"updated_at"`
+	Revision         int             `json:"revision"`
+	Archived         bool            `json:"archived"`
+	URL              string          `json:"url"`
+	APIURL           string          `json:"api_url"`
+	PhotoUploadURL   string          `json:"photo_upload_url"`
+	CatalogNumberURL string          `json:"catalog_number_url"`
+	Intake           json.RawMessage `json:"original_intake,omitempty"`
 }
 
 type apiAssetList struct {
@@ -63,14 +65,15 @@ type apiListPage struct {
 }
 
 type apiAssetSummary struct {
-	ID         int64  `json:"id"`
-	Label      string `json:"label"`
-	Title      string `json:"title"`
-	Revision   int    `json:"revision"`
-	PhotoCount int    `json:"photo_count"`
-	Archived   bool   `json:"archived"`
-	URL        string `json:"url"`
-	APIURL     string `json:"api_url"`
+	ID            int64  `json:"id"`
+	CatalogNumber int64  `json:"catalog_number"`
+	Label         string `json:"label"`
+	Title         string `json:"title"`
+	Revision      int    `json:"revision"`
+	PhotoCount    int    `json:"photo_count"`
+	Archived      bool   `json:"archived"`
+	URL           string `json:"url"`
+	APIURL        string `json:"api_url"`
 }
 
 type apiAssetSummaryList struct {
@@ -98,12 +101,13 @@ func asAPIAsset(c Asset) apiAsset {
 		photos[i] = apiPhoto{ID: photo.ID(), APIURL: fmt.Sprintf("/api/assets/%d/photos/%s", c.ID, photo.ID()), Name: photo.Name, Caption: photo.Caption, Group: photo.Group, Role: role, OriginalURL: "/" + photo.Path, ThumbnailURL: "/" + photo.Thumbnail}
 	}
 	return apiAsset{
-		ID: c.ID, Label: c.Label(), Title: strings.TrimSpace(c.Title()),
+		ID: c.ID, CatalogNumber: c.CatalogNumber, Label: c.Label(), Title: strings.TrimSpace(c.Title()),
 		Description: c.Description, Location: c.Location, Photos: photos,
 		CreatedAt: c.CreatedAt, UpdatedAt: c.UpdatedAt, Revision: c.Revision,
 		Archived: c.Archived, URL: fmt.Sprintf("/assets/%d", c.ID),
 		APIURL: fmt.Sprintf("/api/assets/%d", c.ID), Intake: c.Intake,
-		PhotoUploadURL: fmt.Sprintf("/api/assets/%d/photos", c.ID),
+		PhotoUploadURL:   fmt.Sprintf("/api/assets/%d/photos", c.ID),
+		CatalogNumberURL: fmt.Sprintf("/api/assets/%d/catalog-number", c.ID),
 	}
 }
 
@@ -181,9 +185,9 @@ func (a *App) apiList(w http.ResponseWriter, r *http.Request) {
 		field = query.Get("field")
 	}
 	switch field {
-	case "all", "title", "description", "location", "caption", "id":
+	case "all", "title", "description", "location", "caption", "id", "catalog_number":
 	default:
-		apiError(w, 400, "invalid_request", "field must be all, title, description, location, caption, or id")
+		apiError(w, 400, "invalid_request", "field must be all, title, description, location, caption, id, or catalog_number")
 		return
 	}
 	search := strings.TrimSpace(query.Get("q"))
@@ -236,7 +240,7 @@ func (a *App) apiList(w http.ResponseWriter, r *http.Request) {
 	if view == "summary" {
 		assets := make([]apiAssetSummary, len(summaries))
 		for i, summary := range summaries {
-			assets[i] = apiAssetSummary{ID: summary.ID, Label: fmt.Sprintf("%05d", summary.ID), Title: summary.Title, Revision: summary.Revision, PhotoCount: summary.PhotoCount, Archived: summary.Archived, URL: fmt.Sprintf("/assets/%d", summary.ID), APIURL: fmt.Sprintf("/api/assets/%d", summary.ID)}
+			assets[i] = apiAssetSummary{ID: summary.ID, CatalogNumber: summary.CatalogNumber, Label: fmt.Sprintf("%05d", summary.CatalogNumber), Title: summary.Title, Revision: summary.Revision, PhotoCount: summary.PhotoCount, Archived: summary.Archived, URL: fmt.Sprintf("/assets/%d", summary.ID), APIURL: fmt.Sprintf("/api/assets/%d", summary.ID)}
 		}
 		apiJSON(w, 200, apiAssetSummaryList{Assets: assets, View: "summary", apiListPage: result})
 		return
@@ -259,7 +263,7 @@ func (a *App) apiDetail(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if err != nil || id < 1 || !digits {
-		apiError(w, http.StatusBadRequest, "invalid_id", "Inventory ID must be a positive integer.")
+		apiError(w, http.StatusBadRequest, "invalid_id", "Record ID must be a positive integer.")
 		return
 	}
 	entry, err := a.store.Get(id)
@@ -301,6 +305,9 @@ func (a *App) apiMethodNotAllowed(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.Pattern == "/api/assets/{id}" {
 		allow = "GET, HEAD, PATCH"
+	}
+	if r.Pattern == "/api/assets/{id}/catalog-number" {
+		allow = "POST"
 	}
 	if r.Pattern == "/api/assets/{id}/photos" {
 		allow = "POST"

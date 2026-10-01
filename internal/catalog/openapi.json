@@ -3,7 +3,7 @@
   "info": {
     "title": "Syscat inventory API",
     "version": "1",
-    "description": "Create and search inventory, read records and photographs, attach photos, and PATCH current descriptions, locations, captions, and groups. Writes currently use trusted-network access without authentication, cookies, or CSRF tokens. Edits and attachments require the current asset revision; creation starts a new record at revision 1. URLs are root-relative."
+    "description": "Create and search inventory, read records and photographs, attach photos, and PATCH current descriptions, locations, captions, and groups. Writes currently use trusted-network access without authentication, cookies, or CSRF tokens. Edits and attachments require the current asset revision; creation starts a new record at revision 1. URLs are root-relative. Catalog numbers can change while permanent record IDs and links stay stable."
   },
   "servers": [
     {
@@ -35,12 +35,12 @@
       "get": {
         "operationId": "listAssets",
         "summary": "Search or list inventory",
-        "description": "Newest inventory IDs first. Defaults to active records. Unknown, repeated, or invalid query parameters return 400. Original intake is omitted from listing items; fetch the individual record for it. Previous and next links are omitted when unavailable. Use view=summary for compact catalog review without description bodies, locations, timestamps, or photo metadata; follow api_url for full context. Pagination retains the selected view. Omitting view preserves the existing full response. Use field to restrict q to titles, descriptions, locations, captions, or IDs. Pagination preserves explicit field selection.",
+        "description": "Descending current catalog numbers. Permanent record IDs and URLs remain stable when catalog numbers change. Defaults to active records. Unknown, repeated, or invalid query parameters return 400. Original intake is omitted from listing items; fetch the individual record for it. Previous and next links are omitted when unavailable. Use view=summary for compact catalog review without description bodies, locations, timestamps, or photo metadata; follow api_url for full context. Pagination retains the selected view. Omitting view preserves the existing full response. Use field to restrict q to titles, descriptions, locations, captions, or IDs. Pagination preserves explicit field selection.",
         "parameters": [
           {
             "name": "q",
             "in": "query",
-            "description": "Case-insensitive substring search in description, location, and current photo captions, or exact numeric ID (with or without zero padding).",
+            "description": "Case-insensitive description/location/current-caption substring, or exact numeric permanent ID or catalog number (optional zero padding). Use field=id or field=catalog_number to distinguish them after renumbering.",
             "schema": {
               "type": "string"
             }
@@ -97,7 +97,7 @@
           {
             "name": "field",
             "in": "query",
-            "description": "Restrict q to one current field. all preserves broad search; title searches the complete first description line (before display truncation), description includes that line and the body, caption searches any current photo, and id matches an exact positive numeric inventory ID with optional zero padding. Empty q lists the selected archive set.",
+            "description": "Restrict q to one current field. all preserves broad search; title searches the complete first description line (before display truncation), description includes that line and the body, caption searches any current photo, and id matches an exact positive numeric inventory ID with optional zero padding. Empty q lists the selected archive set. catalog_number matches only the current catalog number; id always matches the permanent record ID.",
             "schema": {
               "type": "string",
               "enum": [
@@ -106,7 +106,8 @@
                 "description",
                 "location",
                 "caption",
-                "id"
+                "id",
+                "catalog_number"
               ],
               "default": "all"
             }
@@ -744,6 +745,107 @@
           }
         }
       }
+    },
+    "/api/assets/{id}/catalog-number": {
+      "post": {
+        "operationId": "changeCatalogNumber",
+        "summary": "Move or swap an asset catalog number",
+        "description": "JSON write using the shared authorization policy. Requires current source revision. An occupied target also requires the current occupant permanent swap_id and swap_revision. Missing/wrong/stale swap expectations or a newly occupied/free target return 409 without changing either record. Archived sources must be restored first; archived targets may participate in explicit swaps and stay archived. Source and occupant revisions advance together, numbers swap atomically, and all permanent IDs, links, photos, and original intake stay unchanged. Requesting the current number with no swap fields is a no-op returning the unchanged source revision. Body limit 128 KiB. No query parameters.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogNumberChange"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Number changed or no-op; swapped_asset present only for a swap.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogNumberResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body, fields, or number.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Source record not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale revision, archived source, or target assignment changed/expected occupant not supplied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON body too large.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Use application/json.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error. Transaction rolled back.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -817,17 +919,20 @@
           "archived",
           "url",
           "api_url",
-          "photo_upload_url"
+          "photo_upload_url",
+          "catalog_number",
+          "catalog_number_url"
         ],
         "properties": {
           "id": {
             "type": "integer",
             "format": "int64",
-            "minimum": 1
+            "minimum": 1,
+            "description": "Permanent sequential record ID. Stable across catalog renumbering; use for URLs and edits."
           },
           "label": {
             "type": "string",
-            "description": "Unprefixed inventory number, padded to at least five digits."
+            "description": "Current catalog number padded to at least five digits, without a prefix."
           },
           "title": {
             "type": "string"
@@ -879,6 +984,17 @@
             "type": "string",
             "format": "uri-reference",
             "description": "Root-relative multipart POST endpoint for attaching photos to this asset."
+          },
+          "catalog_number": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "description": "Mutable unique catalog number displayed in label. Initially matches the permanent id when available. Can be moved or swapped; never use it as a permanent URL identifier."
+          },
+          "catalog_number_url": {
+            "type": "string",
+            "format": "uri-reference",
+            "description": "Root-relative JSON POST endpoint for changing or swapping catalog numbers."
           }
         }
       },
@@ -948,7 +1064,8 @@
               "description",
               "location",
               "caption",
-              "id"
+              "id",
+              "catalog_number"
             ],
             "description": "Selected search field. Present only when field is supplied in the request."
           }
@@ -1112,17 +1229,19 @@
           "archived",
           "url",
           "api_url",
-          "photo_count"
+          "photo_count",
+          "catalog_number"
         ],
         "properties": {
           "id": {
             "type": "integer",
             "format": "int64",
-            "minimum": 1
+            "minimum": 1,
+            "description": "Permanent sequential record ID. Stable across catalog renumbering; use for URLs and edits."
           },
           "label": {
             "type": "string",
-            "description": "Unprefixed inventory number, padded to at least five digits."
+            "description": "Current catalog number padded to at least five digits, without a prefix."
           },
           "title": {
             "type": "string"
@@ -1148,6 +1267,12 @@
             "type": "integer",
             "minimum": 0,
             "description": "Number of photos currently attached, including the overview."
+          },
+          "catalog_number": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "description": "Mutable unique catalog number displayed in label. Initially matches the permanent id when available. Can be moved or swapped; never use it as a permanent URL identifier."
           }
         },
         "description": "Compact current record. Title uses the usual display-title truncation; retrieve the full description via api_url before editing."
@@ -1212,7 +1337,8 @@
               "description",
               "location",
               "caption",
-              "id"
+              "id",
+              "catalog_number"
             ],
             "description": "Selected search field. Present only when field is supplied in the request."
           }
@@ -1311,6 +1437,53 @@
             "description": "Optional trimmed caption for the overview; submit at most once."
           }
         }
+      },
+      "CatalogNumberChange": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "revision",
+          "catalog_number"
+        ],
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Current source asset revision."
+          },
+          "catalog_number": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "description": "Requested positive catalog number. Use an exact integer; maximum 9223372036854775807."
+          },
+          "swap_id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "description": "Permanent record ID currently holding an occupied target number. Required together with swap_revision when occupied; omit both when free."
+          },
+          "swap_revision": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Current revision of swap_id; protects the second system from stale swaps."
+          }
+        }
+      },
+      "CatalogNumberResult": {
+        "type": "object",
+        "required": [
+          "asset"
+        ],
+        "properties": {
+          "asset": {
+            "$ref": "#/components/schemas/AssetDetail"
+          },
+          "swapped_asset": {
+            "$ref": "#/components/schemas/AssetDetail"
+          }
+        },
+        "description": "Updated source record and, for a swap, the updated second record. Both keep their permanent IDs and original intake."
       }
     }
   }

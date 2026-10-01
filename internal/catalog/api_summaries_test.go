@@ -50,7 +50,7 @@ func TestAPISummaryListingsAndPagination(t *testing.T) {
 	if err := json.Unmarshal(result.Body.Bytes(), &raw); err != nil {
 		t.Fatal(err)
 	}
-	expected := map[string]bool{"id": true, "label": true, "title": true, "revision": true, "photo_count": true, "archived": true, "url": true, "api_url": true}
+	expected := map[string]bool{"id": true, "catalog_number": true, "label": true, "title": true, "revision": true, "photo_count": true, "archived": true, "url": true, "api_url": true}
 	if len(raw.Assets[0]) != len(expected) {
 		t.Fatal("unexpected summary fields", raw.Assets[0])
 	}

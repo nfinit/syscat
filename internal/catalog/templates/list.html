@@ -6,7 +6,7 @@
   <form method="get" action="/assets" class="search-form">
     {{if .Archived}}<input type="hidden" name="archived" value="1">{{end}}
     <label class="search-label" for="q">Search entries</label>
-    <input type="search" id="q" name="q" value="{{.Query}}" placeholder="Description, location, caption, or inventory ID">
+    <input type="search" id="q" name="q" value="{{.Query}}" placeholder="Description, location, caption, or catalog number">
     <button class="button" type="submit">Search</button>
     {{if .Query}}<a href="/assets{{if .Archived}}?archived=1{{end}}">Clear</a>{{end}}
   </form>
@@ -26,6 +26,6 @@
 </div>
 <nav class="pagination" aria-label="Collection pages">{{if .Previous}}<a class="button" href="{{.Previous}}">Previous</a>{{end}} {{if .Next}}<a class="button" href="{{.Next}}">Next</a>{{end}}</nav>
 {{else}}
-<div class="empty-state panel"><div class="empty-symbol" aria-hidden="true"></div><h2>{{if .Query}}No matching entries{{else if .Archived}}No archived entries{{else}}No entries{{end}}</h2><p>{{if .Query}}Search by description, location, caption, or inventory ID.{{else if .Archived}}Archived entries can be restored to the collection.{{else}}Use New entry to add a record.{{end}}</p>{{if not .Archived}}<a class="button primary" href="/assets/new">New entry</a>{{end}}</div>
+<div class="empty-state panel"><div class="empty-symbol" aria-hidden="true"></div><h2>{{if .Query}}No matching entries{{else if .Archived}}No archived entries{{else}}No entries{{end}}</h2><p>{{if .Query}}Search by description, location, caption, or catalog number.{{else if .Archived}}Archived entries can be restored to the collection.{{else}}Use New entry to add a record.{{end}}</p>{{if not .Archived}}<a class="button primary" href="/assets/new">New entry</a>{{end}}</div>
 {{end}}
 {{end}}

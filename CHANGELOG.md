@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 1.6.4 - 2026-09-30
+
+- Add mutable catalog numbers alongside permanent sequential record IDs, with a
+  schema-2 migration assigning existing numbers without changing original intake.
+  New intake prefers its sequential ID, using the next free number if occupied.
+- Add previewed browser number changes and revision-checked API moves/swaps;
+  exchange occupied numbers atomically, preserve links/photos/intake, and protect
+  both records against concurrent edits, including archived swap occupants.
+- Expose catalog numbers and renumber links through the API, add explicit number
+  search, and export catalog numbers (a new trailing CSV column). Listings now
+  sort by descending catalog number rather than permanent record ID.
+
 ## 1.6.3 - 2026-09-30
 
 - Add multipart API record creation with required description/overview, optional

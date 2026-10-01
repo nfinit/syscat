@@ -1,0 +1,21 @@
+{{define "number"}}
+<div class="page-heading"><h1>Change catalog number</h1><p><a href="/assets/{{.Asset.ID}}">{{.Asset.Label}} — {{.Asset.Title}}</a></p></div>
+<form method="post" action="/assets/{{.Asset.ID}}/catalog-number" class="panel">
+  <input type="hidden" name="csrf" value="{{.CSRF}}">
+  <input type="hidden" name="revision" value="{{.Asset.Revision}}">
+  {{if .NumberPreview}}
+  <input type="hidden" name="confirm" value="1">
+  <input type="hidden" name="catalog_number" value="{{.NumberTarget}}">
+  <p>{{.Asset.Title}}: {{.Asset.CatalogNumber}} → {{.NumberTarget}}</p>
+  {{if .NumberOther}}
+  <input type="hidden" name="swap_id" value="{{.NumberOther.ID}}">
+  <input type="hidden" name="swap_revision" value="{{.NumberOther.Revision}}">
+  <p>{{.NumberOther.Title}}{{if .NumberOther.Archived}} (archived){{end}}: {{.NumberOther.CatalogNumber}} → {{.Asset.CatalogNumber}}</p>
+  {{end}}
+  <div class="form-actions"><button type="submit" class="button primary">{{if .NumberOther}}Swap numbers{{else}}Change number{{end}}</button><a href="/assets/{{.Asset.ID}}/catalog-number">Cancel</a></div>
+  {{else}}
+  <div class="field"><label for="catalog-number">Catalog number</label><input type="number" id="catalog-number" name="catalog_number" value="{{.NumberTarget}}" min="1" step="1" required></div>
+  <div class="form-actions"><button type="submit" class="button primary">Preview change</button><a href="/assets/{{.Asset.ID}}">Cancel</a></div>
+  {{end}}
+</form>
+{{end}}

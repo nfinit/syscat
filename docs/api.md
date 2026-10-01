@@ -13,9 +13,10 @@ it is accessible to anyone who can reach this trusted-network server.
 | `PATCH /api/assets/{id}` | Update current description or location |
 | `PATCH /api/assets/{id}/photos/{photo_id}` | Update a current photo caption or group |
 | `POST /api/assets/{id}/photos` | Attach one or more photos to an existing asset |
+| `POST /api/assets/{id}/catalog-number` | Move or swap a catalog number |
 | `GET /api/openapi.json` | Embedded OpenAPI 3.0.3 description |
 
-Read endpoints support GET and HEAD; text edits use PATCH and photo uploads use POST.
+Read endpoints support GET and HEAD; text edits use PATCH; creation, uploads, and catalog-number changes use POST.
 Unsupported methods return HTTP 405 with the endpoint’s allowed methods. Unknown
 API endpoints return HTTP 404. Responses and errors are JSON with
 `Cache-Control: no-store`. API calls do not create sessions. Photo deletion/ordering and archive operations
@@ -55,8 +56,8 @@ curl 'http://127.0.0.1:8800/api/assets?field=caption&q=unknown+chip'
 
 | Parameter | Default | Meaning |
 | --- | --- | --- |
-| `q` | Empty | Description/location/photo-caption substring search, or exact inventory ID |
-| `field` | `all` | Restrict `q` to `all`, `title`, `description`, `location`, `caption`, or `id` |
+| `q` | Empty | Description/location/photo-caption substring search, or exact permanent ID/catalog number |
+| `field` | `all` | Restrict `q` to `all`, `title`, `description`, `location`, `caption`, `id`, or `catalog_number` |
 | `page` | `1` | Page number, from 1 to 1,000,000 |
 | `page_size` | `50` | Entries per page, from 1 to 100 |
 | `archived` | `0` | `0`/`false` for active entries; `1`/`true` for archived entries |
@@ -66,12 +67,14 @@ Search uses the same behavior as the HTML catalog: case-insensitive text matchin
 under SQLite's existing LIKE rules, literal `%` and `_`, and exact numeric IDs
 with or without zero padding. Caption matching searches current photos only; an
 entry appears once even if multiple captions match. Results are ordered by
-descending inventory ID.
+descending current catalog number.
 `field=title` searches the complete first description line, including text beyond
 the display title's truncation limit. `field=description` searches the whole
 current description, including its title line. `field=location` searches only
 location; `field=caption` searches current photo captions; `field=id` matches only
-an exact positive numeric inventory ID (zero padding is allowed). A nonnumeric
+an exact positive permanent record ID (zero padding is allowed).
+`field=catalog_number` matches only the current catalog number. Broad search
+matches either numeric identity; use an explicit field to disambiguate a swap. A nonnumeric
 ID query matches nothing. Original intake and photo group names are excluded.
 An omitted field or `field=all` keeps the existing broad search. Empty `q` lists
 all entries in the selected archive set, regardless of field. Field names must
@@ -93,7 +96,7 @@ individual records. Omitting `view` preserves the original full listing format.
 For a large catalog, begin with `GET /api/assets?view=summary&page_size=100`.
 The envelope also includes `"view": "summary"`; each asset contains only:
 
-- `id`, `label`, and `title` (the same display title as a full record).
+- Permanent `id`, mutable `catalog_number`, display `label`, and `title`.
 - `revision`, `photo_count` (current attached photos), and `archived`.
 - `url` for the web page and `api_url` for the full record and asset PATCH endpoint.
 
@@ -110,10 +113,13 @@ curl http://127.0.0.1:8800/api/assets/1
 curl http://127.0.0.1:8800/api/assets/00001
 ```
 
-Each record contains numeric `id`, display `label`, a short `title`, the full
+Each record contains permanent numeric `id`, mutable `catalog_number`, display
+`label`, a short `title`, the full
 `description`, `location`, ordered `photos`, `created_at`, `updated_at`,
 `revision`, and `archived`. It also provides `url` for the HTML entry and
-`api_url` for its JSON representation, plus `photo_upload_url` for attaching photos.
+`api_url` for its JSON representation, `photo_upload_url` for attaching photos,
+and `catalog_number_url` for renumbering. URLs always use permanent `id`, never
+`catalog_number`.
 Individual records include
 `original_intake`, the stored initial snapshot. Archived records are readable
 by ID. An invalid ID returns 400; an ID with no record returns 404.
@@ -144,6 +150,8 @@ Original intake is returned as stored, with photo `path` and `thumbnail` values
 instead of URL fields. Prefix those paths with `/` to retrieve the images from
 the same server. Its snapshot ID may be `0` because it was captured before the
 permanent ID was allocated; use the outer record's `id` to address the entry.
+Older intake snapshots may omit `catalog_number`. New intake captures its initial
+catalog number; renumbering never rewrites either kind of snapshot.
 Deleting a photo removes it from current `photos` and any original-intake photo
 references. Its original and thumbnail files are deleted after a successful save.
 Other original-intake fields remain unchanged.
@@ -287,6 +295,52 @@ archived records return HTTP 409. If a response is lost, reread the asset and
 check which photos were attached before retrying; do not blindly repeat an upload
 with a newer revision, which would attach duplicates. Authentication can gate
 this route through the same write policy used for PATCH.
+
+## Catalog numbers and permanent IDs
+
+`id` is the permanent sequential record identity. `catalog_number` is the mutable,
+unique number shown in `label` and the browser. Existing inventory upgrades assign
+`catalog_number=id` without changing intake or revisions. New records prefer the
+same number as their sequential ID; if a future number has already been assigned,
+they use the first available number above that ID. Archived numbers remain reserved.
+
+To move a record to an unused number, POST JSON to its `catalog_number_url`:
+
+```sh
+curl -X POST http://127.0.0.1:8800/api/assets/43/catalog-number \
+  -H 'Content-Type: application/json' \
+  -d '{"revision":6,"catalog_number":100}'
+```
+
+To use an occupied number, first find its occupant with
+`GET /api/assets?field=catalog_number&q=1` (check `archived=1` too if needed), then
+read both full records. Supply that occupant's permanent ID and current revision:
+
+```sh
+curl -X POST http://127.0.0.1:8800/api/assets/43/catalog-number \
+  -H 'Content-Type: application/json' \
+  -d '{"revision":6,"catalog_number":1,"swap_id":1,"swap_revision":1}'
+```
+
+Replace all example revisions with current values. The source takes the requested
+number; its occupant takes the source's old number. HTTP 200 returns `asset` and,
+for a swap, `swapped_asset`, each a full record. Both revisions advance on a swap;
+only the source advances on a move. Requesting the source's current number with
+no swap fields is a no-op. Permanent IDs, all URLs, image IDs/files, descriptions,
+archive status, and original intake remain with their records.
+
+Occupied numbers require **both** `swap_id` and `swap_revision`; omit both for an
+unused number. Stale source/target revisions, wrong occupant IDs, or a changed
+assignment return HTTP 409 and leave both records unchanged. Archived sources
+must be restored before renumbering; archived occupants may participate in an
+explicit swap. JSON parsing, limits, and authorization match PATCH. Normal PATCH
+and creation do not accept editable catalog numbers; use this dedicated endpoint.
+
+The browser's **Change number** control previews the affected systems before
+applying the move or swap, with the same revision checks and no JavaScript required.
+Collection and API lists now sort by descending catalog number. JSON exports add
+`catalog_number`; CSV preserves its existing columns and appends `catalog_number`,
+with `id` remaining permanent and `label` reflecting the current catalog number.
 
 ## Errors
 

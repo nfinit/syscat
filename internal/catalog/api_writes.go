@@ -37,7 +37,7 @@ func apiPatchObject(w http.ResponseWriter, r *http.Request, fields ...string) (m
 		return nil, false
 	}
 	if r.URL.RawQuery != "" {
-		apiError(w, http.StatusBadRequest, "invalid_request", "PATCH endpoints do not accept query parameters.")
+		apiError(w, http.StatusBadRequest, "invalid_request", "JSON write endpoints do not accept query parameters.")
 		return nil, false
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, maxAPIWriteBytes)
@@ -138,7 +138,7 @@ func (a *App) apiWriteAsset(w http.ResponseWriter, r *http.Request, revision int
 		}
 	}
 	if err != nil || id < 1 || !valid {
-		apiError(w, 400, "invalid_id", "Inventory ID must be a positive integer.")
+		apiError(w, 400, "invalid_id", "Record ID must be a positive integer.")
 		return Asset{}, false
 	}
 	c, err := a.store.Get(id)

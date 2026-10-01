@@ -38,18 +38,25 @@ func (p Photo) ID() string {
 }
 
 type Asset struct {
-	ID          int64           `json:"id"`
-	Description string          `json:"description"`
-	Location    string          `json:"location"`
-	Photos      []Photo         `json:"photos"`
-	CreatedAt   string          `json:"created_at"`
-	UpdatedAt   string          `json:"updated_at"`
-	Revision    int             `json:"revision"`
-	Archived    bool            `json:"archived"`
-	Intake      json.RawMessage `json:"original_intake,omitempty"`
+	ID            int64           `json:"id"`
+	CatalogNumber int64           `json:"catalog_number,omitempty"`
+	Description   string          `json:"description"`
+	Location      string          `json:"location"`
+	Photos        []Photo         `json:"photos"`
+	CreatedAt     string          `json:"created_at"`
+	UpdatedAt     string          `json:"updated_at"`
+	Revision      int             `json:"revision"`
+	Archived      bool            `json:"archived"`
+	Intake        json.RawMessage `json:"original_intake,omitempty"`
 }
 
-func (c Asset) Label() string { return fmt.Sprintf("%05d", c.ID) }
+func (c Asset) Label() string {
+	number := c.CatalogNumber
+	if number == 0 {
+		number = c.ID
+	}
+	return fmt.Sprintf("%05d", number)
+}
 func (c Asset) Title() string {
 	if c.Description == "" {
 		return "Unidentified item"
@@ -95,32 +102,32 @@ func (s *Store) initialize() error {
 	if err := tx.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
 		return err
 	}
-	if version > 1 {
-		return fmt.Errorf("database schema %d is newer than this Syscat supports (1)", version)
+	if version > 2 {
+		return fmt.Errorf("database schema %d is newer than this Syscat supports (2)", version)
 	}
-	if version == 0 {
-		script, err := migrations.ReadFile("migrations/001.sql")
+	for next := version + 1; next <= 2; next++ {
+		script, err := migrations.ReadFile(fmt.Sprintf("migrations/%03d.sql", next))
 		if err != nil {
 			return err
 		}
 		if _, err := tx.Exec(string(script)); err != nil {
 			return err
 		}
-		if _, err := tx.Exec("PRAGMA user_version=1"); err != nil {
+		if _, err := tx.Exec(fmt.Sprintf("PRAGMA user_version=%d", next)); err != nil {
 			return err
 		}
 	}
 	return tx.Commit()
 }
 
-const columns = `id, description, location, photos, created_at, updated_at, revision, archived, intake`
+const columns = `id, catalog_number, description, location, photos, created_at, updated_at, revision, archived, intake`
 
 type scanner interface{ Scan(...any) error }
 
 func scanAsset(row scanner) (Asset, error) {
 	var c Asset
 	var photos, intake string
-	err := row.Scan(&c.ID, &c.Description, &c.Location, &photos, &c.CreatedAt, &c.UpdatedAt, &c.Revision, &c.Archived, &intake)
+	err := row.Scan(&c.ID, &c.CatalogNumber, &c.Description, &c.Location, &photos, &c.CreatedAt, &c.UpdatedAt, &c.Revision, &c.Archived, &intake)
 	if err != nil {
 		return c, err
 	}
@@ -154,11 +161,40 @@ func (s *Store) Create(c Asset, key string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	result, err := s.db.Exec(`INSERT INTO assets(description, location, photos, intake, created_at, updated_at, submission_key) VALUES(?,?,?,?,?,?,?)`, c.Description, c.Location, string(photos), string(intake), now, now, key)
+	tx, err := s.db.Begin()
 	if err != nil {
 		return 0, err
 	}
-	return result.LastInsertId()
+	defer tx.Rollback()
+	result, err := tx.Exec(`INSERT INTO assets(description, location, photos, intake, created_at, updated_at, submission_key) VALUES(?,?,?,?,?,?,?)`, c.Description, c.Location, string(photos), string(intake), now, now, key)
+	if err != nil {
+		return 0, err
+	}
+	id, err := result.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+	// Prefer the sequential ID, then the first free number above it. Reserved
+	// future catalog numbers cannot prevent new sequential records being created.
+	err = tx.QueryRow(`SELECT candidate FROM (
+ SELECT ? AS candidate UNION SELECT catalog_number+1 FROM assets
+ WHERE catalog_number>=? AND catalog_number<9223372036854775807
+) WHERE NOT EXISTS (SELECT 1 FROM assets WHERE catalog_number=candidate)
+ORDER BY candidate LIMIT 1`, id, id).Scan(&c.CatalogNumber)
+	if err != nil {
+		return 0, err
+	}
+	intake, err = json.Marshal(c)
+	if err != nil {
+		return 0, err
+	}
+	if _, err := tx.Exec(`UPDATE assets SET catalog_number=?, intake=? WHERE id=?`, c.CatalogNumber, string(intake), id); err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return id, nil
 }
 
 func (s *Store) Update(c Asset) error {
@@ -229,12 +265,15 @@ func assetSearchWhere(query string, archived bool, field string) (string, []any)
 		case "caption":
 			where += ` AND EXISTS (SELECT 1 FROM json_each(assets.photos) AS photo WHERE json_extract(photo.value, '$.caption') LIKE ? ESCAPE '\')`
 			args = append(args, pattern)
+		case "catalog_number":
+			where += ` AND catalog_number=?`
+			args = append(args, id)
 		case "id":
 			where += ` AND id=?`
 			args = append(args, id)
 		default:
-			where += ` AND ((description || ' ' || location) LIKE ? ESCAPE '\' OR id=? OR EXISTS (SELECT 1 FROM json_each(assets.photos) AS photo WHERE json_extract(photo.value, '$.caption') LIKE ? ESCAPE '\'))`
-			args = append(args, pattern, id, pattern)
+			where += ` AND ((description || ' ' || location) LIKE ? ESCAPE '\' OR id=? OR catalog_number=? OR EXISTS (SELECT 1 FROM json_each(assets.photos) AS photo WHERE json_extract(photo.value, '$.caption') LIKE ? ESCAPE '\'))`
+			args = append(args, pattern, id, id, pattern)
 		}
 	}
 	return where, args
@@ -251,7 +290,7 @@ func (s *Store) listWithField(query string, archived bool, limit, offset int, fi
 		return nil, 0, err
 	}
 	args = append(args, limit, offset)
-	rows, err := s.db.Query("SELECT "+columns+" FROM assets"+where+" ORDER BY id DESC LIMIT ? OFFSET ?", args...)
+	rows, err := s.db.Query("SELECT "+columns+" FROM assets"+where+" ORDER BY catalog_number DESC LIMIT ? OFFSET ?", args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -269,6 +308,7 @@ func (s *Store) listWithField(query string, archived bool, limit, offset int, fi
 
 type AssetSummary struct {
 	ID                   int64
+	CatalogNumber        int64
 	Title                string
 	Revision, PhotoCount int
 	Archived             bool
@@ -287,7 +327,7 @@ func (s *Store) listSummariesWithField(query string, archived bool, limit, offse
 		return nil, 0, err
 	}
 	args = append(args, limit, offset)
-	rows, err := s.db.Query(`SELECT id, CASE WHEN instr(description,char(10))>0 THEN substr(description,1,instr(description,char(10))-1) ELSE description END, description='', revision, COALESCE(json_array_length(photos),0), archived FROM assets`+where+" ORDER BY id DESC LIMIT ? OFFSET ?", args...)
+	rows, err := s.db.Query(`SELECT id, catalog_number, CASE WHEN instr(description,char(10))>0 THEN substr(description,1,instr(description,char(10))-1) ELSE description END, description='', revision, COALESCE(json_array_length(photos),0), archived FROM assets`+where+" ORDER BY catalog_number DESC LIMIT ? OFFSET ?", args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -297,7 +337,7 @@ func (s *Store) listSummariesWithField(query string, archived bool, limit, offse
 		var summary AssetSummary
 		var firstLine string
 		var emptyDescription bool
-		if err := rows.Scan(&summary.ID, &firstLine, &emptyDescription, &summary.Revision, &summary.PhotoCount, &summary.Archived); err != nil {
+		if err := rows.Scan(&summary.ID, &summary.CatalogNumber, &firstLine, &emptyDescription, &summary.Revision, &summary.PhotoCount, &summary.Archived); err != nil {
 			return nil, 0, err
 		}
 		summary.Title = strings.TrimSpace((Asset{Description: firstLine}).Title())

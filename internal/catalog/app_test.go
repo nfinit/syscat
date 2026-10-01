@@ -368,7 +368,7 @@ func TestPhotoEXIFOrientation(t *testing.T) {
 
 func TestRejectNewerSchema(t *testing.T) {
 	app, _, dir := start(t)
-	if _, err := app.store.db.Exec("PRAGMA user_version=2"); err != nil {
+	if _, err := app.store.db.Exec("PRAGMA user_version=3"); err != nil {
 		t.Fatal(err)
 	}
 	app.Close()
@@ -385,7 +385,7 @@ func TestRejectNewerSchema(t *testing.T) {
 func TestSystemIntakeFormAndDetailedDescription(t *testing.T) {
 	app, b, _ := start(t)
 	form := b.get("/assets/new").Body.String()
-	for _, text := range []string{"Syscat", "Overview photo", "Detail photos", "multiple", "<textarea", "Inventory ID assigned"} {
+	for _, text := range []string{"Syscat", "Overview photo", "Detail photos", "multiple", "<textarea", "Catalog number assigned"} {
 		if !strings.Contains(form, text) {
 			t.Errorf("missing %q", text)
 		}
