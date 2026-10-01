@@ -1,9 +1,9 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "Syscat read-only API",
+    "title": "Syscat inventory API",
     "version": "1",
-    "description": "Search inventory, read individual records, and retrieve photographs. No login or cookies are required. URLs are root-relative; resolve them against the server origin. No write endpoints are provided."
+    "description": "Search inventory, read records and photographs, and PATCH current descriptions, locations, captions, and groups. Writes currently use trusted-network access without authentication, cookies, or CSRF tokens. Every write requires the current asset revision. URLs are root-relative."
   },
   "servers": [
     {
@@ -35,7 +35,7 @@
       "get": {
         "operationId": "listAssets",
         "summary": "Search or list inventory",
-        "description": "Newest inventory IDs first. Defaults to active records. Unknown, repeated, or invalid query parameters return 400. Original intake is omitted from listing items; fetch the individual record for it. Previous and next links are omitted when unavailable.",
+        "description": "Newest inventory IDs first. Defaults to active records. Unknown, repeated, or invalid query parameters return 400. Original intake is omitted from listing items; fetch the individual record for it. Previous and next links are omitted when unavailable. Use view=summary for compact catalog review without description bodies, locations, timestamps, or photo metadata; follow api_url for full context. Pagination retains the selected view. Omitting view preserves the existing full response. Use field to restrict q to titles, descriptions, locations, captions, or IDs. Pagination preserves explicit field selection.",
         "parameters": [
           {
             "name": "q",
@@ -80,6 +80,36 @@
               ],
               "default": "0"
             }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "description": "Response projection. Summary records contain identity, display title, revision, photo count, archive state, and record links.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "full",
+                "summary"
+              ],
+              "default": "full"
+            }
+          },
+          {
+            "name": "field",
+            "in": "query",
+            "description": "Restrict q to one current field. all preserves broad search; title searches the complete first description line (before display truncation), description includes that line and the body, caption searches any current photo, and id matches an exact positive numeric inventory ID with optional zero padding. Empty q lists the selected archive set.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "title",
+                "description",
+                "location",
+                "caption",
+                "id"
+              ],
+              "default": "all"
+            }
           }
         ],
         "responses": {
@@ -88,7 +118,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AssetList"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/AssetList"
+                    },
+                    {
+                      "$ref": "#/components/schemas/AssetSummaryList"
+                    }
+                  ]
                 }
               }
             }
@@ -166,6 +203,94 @@
           },
           "500": {
             "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "patchAsset",
+        "summary": "Edit asset text",
+        "description": "Trusted-network write; no credentials or browser session required. Query parameters are not accepted. Photo PATCH returns the full updated asset. IDs, intake, timestamps, files, order, and archive state cannot be directly overwritten.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssetPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated full asset with its incremented revision.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body, unsupported fields, or invalid edits.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Asset or attached photo not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale revision or archived asset. Read the latest asset before retrying.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON body exceeds 128 KiB.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Content-Type must be application/json.",
             "content": {
               "application/json": {
                 "schema": {
@@ -272,6 +397,105 @@
           }
         }
       }
+    },
+    "/api/assets/{id}/photos/{photo_id}": {
+      "patch": {
+        "operationId": "patchPhoto",
+        "summary": "Edit a photo caption or group",
+        "description": "Trusted-network write; no credentials or browser session required. Query parameters are not accepted. Photo PATCH returns the full updated asset. IDs, intake, timestamps, files, order, and archive state cannot be directly overwritten.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "photo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Use the stable id from a current photo, or follow its api_url."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhotoPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated full asset with its incremented revision.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body, unsupported fields, or invalid edits.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Asset or attached photo not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale revision or archived asset. Read the latest asset before retrying.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON body exceeds 128 KiB.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Content-Type must be application/json.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -284,7 +508,9 @@
           "original_url",
           "thumbnail_url",
           "caption",
-          "group"
+          "group",
+          "id",
+          "api_url"
         ],
         "properties": {
           "original_name": {
@@ -316,6 +542,15 @@
             "type": "string",
             "maxLength": 100,
             "description": "Photo group name. Empty for the overview and ungrouped detail photos. Named groups appear in saved order, followed by ungrouped details."
+          },
+          "id": {
+            "type": "string",
+            "description": "Stable opaque photo ID, independent of ordering, caption, group, and overview role."
+          },
+          "api_url": {
+            "type": "string",
+            "format": "uri-reference",
+            "description": "PATCH endpoint for this photo; returns the updated asset."
           }
         }
       },
@@ -450,6 +685,18 @@
           "next": {
             "type": "string",
             "format": "uri-reference"
+          },
+          "field": {
+            "type": "string",
+            "enum": [
+              "all",
+              "title",
+              "description",
+              "location",
+              "caption",
+              "id"
+            ],
+            "description": "Selected search field. Present only when field is supplied in the request."
           }
         }
       },
@@ -473,7 +720,12 @@
                   "invalid_id",
                   "not_found",
                   "method_not_allowed",
-                  "internal_error"
+                  "internal_error",
+                  "conflict",
+                  "unsupported_media_type",
+                  "request_too_large",
+                  "unauthorized",
+                  "forbidden"
                 ]
               },
               "message": {
@@ -489,7 +741,8 @@
           "name",
           "build",
           "read_only",
-          "links"
+          "links",
+          "write_authentication"
         ],
         "properties": {
           "name": {
@@ -504,7 +757,7 @@
           "read_only": {
             "type": "boolean",
             "enum": [
-              true
+              false
             ]
           },
           "links": {
@@ -512,7 +765,8 @@
             "required": [
               "self",
               "assets",
-              "openapi"
+              "openapi",
+              "summaries"
             ],
             "properties": {
               "self": {
@@ -526,10 +780,190 @@
               "openapi": {
                 "type": "string",
                 "format": "uri-reference"
+              },
+              "summaries": {
+                "type": "string",
+                "format": "uri-reference",
+                "description": "Compact catalog listing for agent review."
               }
             }
+          },
+          "write_authentication": {
+            "type": "string",
+            "enum": [
+              "trusted_network"
+            ],
+            "description": "API writes currently permit trusted-network clients without credentials."
           }
         }
+      },
+      "AssetPatch": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "revision"
+        ],
+        "minProperties": 2,
+        "description": "Include revision and at least one editable field. Omitted fields stay unchanged. Null and duplicate fields are rejected; text is trimmed. Maximum request body 128 KiB.",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Current asset revision from GET or a previous successful PATCH."
+          },
+          "description": {
+            "type": "string",
+            "description": "Required description, maximum 20,000 UTF-8 bytes after trimming."
+          },
+          "location": {
+            "type": "string",
+            "description": "Optional location, maximum 500 UTF-8 bytes after trimming. Empty string clears it."
+          }
+        }
+      },
+      "PhotoPatch": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "revision"
+        ],
+        "minProperties": 2,
+        "description": "Include revision and at least one editable field. Omitted fields stay unchanged. Null and duplicate fields are rejected; text is trimmed. Maximum request body 128 KiB.",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Current asset revision from GET or a previous successful PATCH."
+          },
+          "caption": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "Empty string clears the caption."
+          },
+          "group": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Single-line case-sensitive group name. Empty string makes a detail photo ungrouped. The overview cannot join a named group. Saving normalizes group order."
+          }
+        }
+      },
+      "AssetSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "label",
+          "title",
+          "revision",
+          "archived",
+          "url",
+          "api_url",
+          "photo_count"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "label": {
+            "type": "string",
+            "description": "Unprefixed inventory number, padded to at least five digits."
+          },
+          "title": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri-reference",
+            "description": "Root-relative HTML entry URL."
+          },
+          "api_url": {
+            "type": "string",
+            "format": "uri-reference",
+            "description": "Root-relative API entry URL."
+          },
+          "photo_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of photos currently attached, including the overview."
+          }
+        },
+        "description": "Compact current record. Title uses the usual display-title truncation; retrieve the full description via api_url before editing."
+      },
+      "AssetSummaryList": {
+        "type": "object",
+        "required": [
+          "assets",
+          "total",
+          "page",
+          "page_size",
+          "query",
+          "archived",
+          "view"
+        ],
+        "properties": {
+          "assets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssetSummary"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "query": {
+            "type": "string"
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "previous": {
+            "type": "string",
+            "format": "uri-reference"
+          },
+          "next": {
+            "type": "string",
+            "format": "uri-reference"
+          },
+          "view": {
+            "type": "string",
+            "enum": [
+              "summary"
+            ]
+          },
+          "field": {
+            "type": "string",
+            "enum": [
+              "all",
+              "title",
+              "description",
+              "location",
+              "caption",
+              "id"
+            ],
+            "description": "Selected search field. Present only when field is supplied in the request."
+          }
+        },
+        "description": "Summary projection of a listing; pagination links retain view=summary and other filters."
       }
     }
   }

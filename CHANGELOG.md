@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 1.6.2 - 2026-09-30
+
+- Add explicit API search fields for titles, descriptions, locations, photo
+  captions, and inventory IDs, retaining the selected field in pagination.
+- Add optional summary listings with stable asset links, titles, revisions, and
+  photo counts for agent review. Preserve full listings by default, share search
+  behavior, and carry view selection through pagination and API discovery.
+- Add trusted-network JSON PATCH endpoints for asset descriptions/locations and
+  photo captions/groups. Require asset revisions, preserve omitted fields and
+  intake, expose stable photo IDs, and share form validation and save rules.
+- Route API writes through a central authorization policy and document write
+  discovery, request schemas, and conflict handling in OpenAPI and API docs.
+
 ## 1.6.1 - 2026-09-30
 
 - Strip location-capable metadata from new JPEG, PNG, and GIF uploads without

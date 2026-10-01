@@ -1,8 +1,10 @@
 package catalog
 
 import (
+	"crypto/sha256"
 	"database/sql"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -26,6 +28,13 @@ type Photo struct {
 	Name      string `json:"original_name"`
 	Caption   string `json:"caption,omitempty"`
 	Group     string `json:"group,omitempty"`
+}
+
+// IDs derive from immutable file paths, so existing inventories need no migration.
+// Never use the mutable array position to identify a photo.
+func (p Photo) ID() string {
+	digest := sha256.Sum256([]byte(p.Path))
+	return hex.EncodeToString(digest[:16])
 }
 
 type Asset struct {
@@ -199,18 +208,44 @@ func (s *Store) Archive(id int64, revision int, archived bool) error {
 	return err
 }
 
-func (s *Store) List(query string, archived bool, limit, offset int) ([]Asset, int, error) {
+func assetSearchWhere(query string, archived bool, field string) (string, []any) {
 	where := ` WHERE archived=?`
 	args := []any{archived}
 	if query != "" {
-		where += ` AND ((description || ' ' || location) LIKE ? ESCAPE '\' OR id=? OR EXISTS (SELECT 1 FROM json_each(assets.photos) AS photo WHERE json_extract(photo.value, '$.caption') LIKE ? ESCAPE '\'))`
 		escaped := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(query)
+		pattern := "%" + escaped + "%"
 		id, err := strconv.ParseInt(query, 10, 64)
 		if err != nil || id < 1 {
 			id = 0
 		}
-		args = append(args, "%"+escaped+"%", id, "%"+escaped+"%")
+		switch field {
+		case "title":
+			where += ` AND (CASE WHEN instr(description,char(10))>0 THEN substr(description,1,instr(description,char(10))-1) ELSE description END) LIKE ? ESCAPE '\'`
+			args = append(args, pattern)
+		case "description", "location":
+			// The column name comes only from these two fixed choices.
+			where += ` AND ` + field + ` LIKE ? ESCAPE '\'`
+			args = append(args, pattern)
+		case "caption":
+			where += ` AND EXISTS (SELECT 1 FROM json_each(assets.photos) AS photo WHERE json_extract(photo.value, '$.caption') LIKE ? ESCAPE '\')`
+			args = append(args, pattern)
+		case "id":
+			where += ` AND id=?`
+			args = append(args, id)
+		default:
+			where += ` AND ((description || ' ' || location) LIKE ? ESCAPE '\' OR id=? OR EXISTS (SELECT 1 FROM json_each(assets.photos) AS photo WHERE json_extract(photo.value, '$.caption') LIKE ? ESCAPE '\'))`
+			args = append(args, pattern, id, pattern)
+		}
 	}
+	return where, args
+}
+
+func (s *Store) List(query string, archived bool, limit, offset int) ([]Asset, int, error) {
+	return s.listWithField(query, archived, limit, offset, "all")
+}
+
+func (s *Store) listWithField(query string, archived bool, limit, offset int, field string) ([]Asset, int, error) {
+	where, args := assetSearchWhere(query, archived, field)
 	var count int
 	if err := s.db.QueryRow("SELECT count(*) FROM assets"+where, args...).Scan(&count); err != nil {
 		return nil, 0, err
@@ -230,6 +265,48 @@ func (s *Store) List(query string, archived bool, limit, offset int) ([]Asset, i
 		assets = append(assets, c)
 	}
 	return assets, count, rows.Err()
+}
+
+type AssetSummary struct {
+	ID                   int64
+	Title                string
+	Revision, PhotoCount int
+	Archived             bool
+}
+
+// Summary reads avoid loading full descriptions, intake snapshots, and photo
+// arrays. Search still uses the exact predicates shared with the full listing.
+func (s *Store) ListSummaries(query string, archived bool, limit, offset int) ([]AssetSummary, int, error) {
+	return s.listSummariesWithField(query, archived, limit, offset, "all")
+}
+
+func (s *Store) listSummariesWithField(query string, archived bool, limit, offset int, field string) ([]AssetSummary, int, error) {
+	where, args := assetSearchWhere(query, archived, field)
+	var total int
+	if err := s.db.QueryRow("SELECT count(*) FROM assets"+where, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	args = append(args, limit, offset)
+	rows, err := s.db.Query(`SELECT id, CASE WHEN instr(description,char(10))>0 THEN substr(description,1,instr(description,char(10))-1) ELSE description END, description='', revision, COALESCE(json_array_length(photos),0), archived FROM assets`+where+" ORDER BY id DESC LIMIT ? OFFSET ?", args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	summaries := []AssetSummary{}
+	for rows.Next() {
+		var summary AssetSummary
+		var firstLine string
+		var emptyDescription bool
+		if err := rows.Scan(&summary.ID, &firstLine, &emptyDescription, &summary.Revision, &summary.PhotoCount, &summary.Archived); err != nil {
+			return nil, 0, err
+		}
+		summary.Title = strings.TrimSpace((Asset{Description: firstLine}).Title())
+		if firstLine == "" && !emptyDescription {
+			summary.Title = ""
+		}
+		summaries = append(summaries, summary)
+	}
+	return summaries, total, rows.Err()
 }
 
 func (s *Store) Suggestions(field string) ([]string, error) {

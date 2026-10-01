@@ -19,6 +19,8 @@ import (
 var openAPISpec []byte
 
 type apiPhoto struct {
+	ID           string `json:"id"`
+	APIURL       string `json:"api_url"`
 	Name         string `json:"original_name"`
 	Caption      string `json:"caption"`
 	Group        string `json:"group"`
@@ -44,14 +46,36 @@ type apiAsset struct {
 }
 
 type apiAssetList struct {
-	Assets   []apiAsset `json:"assets"`
-	Total    int        `json:"total"`
-	Page     int        `json:"page"`
-	PageSize int        `json:"page_size"`
-	Query    string     `json:"query"`
-	Archived bool       `json:"archived"`
-	Previous string     `json:"previous,omitempty"`
-	Next     string     `json:"next,omitempty"`
+	Assets []apiAsset `json:"assets"`
+	apiListPage
+}
+
+type apiListPage struct {
+	Total    int    `json:"total"`
+	Page     int    `json:"page"`
+	PageSize int    `json:"page_size"`
+	Query    string `json:"query"`
+	Field    string `json:"field,omitempty"`
+	Archived bool   `json:"archived"`
+	Previous string `json:"previous,omitempty"`
+	Next     string `json:"next,omitempty"`
+}
+
+type apiAssetSummary struct {
+	ID         int64  `json:"id"`
+	Label      string `json:"label"`
+	Title      string `json:"title"`
+	Revision   int    `json:"revision"`
+	PhotoCount int    `json:"photo_count"`
+	Archived   bool   `json:"archived"`
+	URL        string `json:"url"`
+	APIURL     string `json:"api_url"`
+}
+
+type apiAssetSummaryList struct {
+	Assets []apiAssetSummary `json:"assets"`
+	View   string            `json:"view"`
+	apiListPage
 }
 
 type apiErrorResponse struct {
@@ -70,7 +94,7 @@ func asAPIAsset(c Asset) apiAsset {
 		if i == 0 {
 			role = "overview"
 		}
-		photos[i] = apiPhoto{Name: photo.Name, Caption: photo.Caption, Group: photo.Group, Role: role, OriginalURL: "/" + photo.Path, ThumbnailURL: "/" + photo.Thumbnail}
+		photos[i] = apiPhoto{ID: photo.ID(), APIURL: fmt.Sprintf("/api/assets/%d/photos/%s", c.ID, photo.ID()), Name: photo.Name, Caption: photo.Caption, Group: photo.Group, Role: role, OriginalURL: "/" + photo.Path, ThumbnailURL: "/" + photo.Thumbnail}
 	}
 	return apiAsset{
 		ID: c.ID, Label: c.Label(), Title: strings.TrimSpace(c.Title()),
@@ -121,7 +145,7 @@ func (a *App) apiList(w http.ResponseWriter, r *http.Request) {
 	}
 	for key, values := range query {
 		switch key {
-		case "q", "page", "page_size", "archived":
+		case "q", "page", "page_size", "archived", "view", "field":
 		default:
 			apiError(w, http.StatusBadRequest, "invalid_request", "Unknown query parameter: "+key)
 			return
@@ -150,16 +174,40 @@ func (a *App) apiList(w http.ResponseWriter, r *http.Request) {
 		apiError(w, http.StatusBadRequest, "invalid_request", "archived must be 0, 1, false, or true")
 		return
 	}
+	field := "all"
+	if query.Has("field") {
+		field = query.Get("field")
+	}
+	switch field {
+	case "all", "title", "description", "location", "caption", "id":
+	default:
+		apiError(w, 400, "invalid_request", "field must be all, title, description, location, caption, or id")
+		return
+	}
 	search := strings.TrimSpace(query.Get("q"))
-	entries, total, err := a.store.List(search, archived, size, (page-1)*size)
+	view := "full"
+	if query.Has("view") {
+		view = query.Get("view")
+	}
+	if view != "full" && view != "summary" {
+		apiError(w, 400, "invalid_request", "view must be full or summary")
+		return
+	}
+	var entries []Asset
+	var summaries []AssetSummary
+	var total int
+	if view == "summary" {
+		summaries, total, err = a.store.listSummariesWithField(search, archived, size, (page-1)*size, field)
+	} else {
+		entries, total, err = a.store.listWithField(search, archived, size, (page-1)*size, field)
+	}
 	if err != nil {
 		apiFailure(w, err)
 		return
 	}
-	result := apiAssetList{Assets: make([]apiAsset, len(entries)), Total: total, Page: page, PageSize: size, Query: search, Archived: archived}
-	for i, entry := range entries {
-		entry.Intake = nil // Full intake snapshots are available on the detail endpoint.
-		result.Assets[i] = asAPIAsset(entry)
+	result := apiListPage{Total: total, Page: page, PageSize: size, Query: search, Archived: archived}
+	if query.Has("field") {
+		result.Field = field
 	}
 	link := func(number int) string {
 		values := url.Values{"page": {strconv.Itoa(number)}, "page_size": {strconv.Itoa(size)}}
@@ -169,6 +217,12 @@ func (a *App) apiList(w http.ResponseWriter, r *http.Request) {
 		if archived {
 			values.Set("archived", "1")
 		}
+		if query.Has("field") {
+			values.Set("field", field)
+		}
+		if query.Has("view") {
+			values.Set("view", view)
+		}
 		return "/api/assets?" + values.Encode()
 	}
 	if page > 1 {
@@ -177,7 +231,20 @@ func (a *App) apiList(w http.ResponseWriter, r *http.Request) {
 	if page*size < total {
 		result.Next = link(page + 1)
 	}
-	apiJSON(w, http.StatusOK, result)
+	if view == "summary" {
+		assets := make([]apiAssetSummary, len(summaries))
+		for i, summary := range summaries {
+			assets[i] = apiAssetSummary{ID: summary.ID, Label: fmt.Sprintf("%05d", summary.ID), Title: summary.Title, Revision: summary.Revision, PhotoCount: summary.PhotoCount, Archived: summary.Archived, URL: fmt.Sprintf("/assets/%d", summary.ID), APIURL: fmt.Sprintf("/api/assets/%d", summary.ID)}
+		}
+		apiJSON(w, 200, apiAssetSummaryList{Assets: assets, View: "summary", apiListPage: result})
+		return
+	}
+	assets := make([]apiAsset, len(entries))
+	for i, entry := range entries {
+		entry.Intake = nil
+		assets[i] = asAPIAsset(entry)
+	}
+	apiJSON(w, 200, apiAssetList{Assets: assets, apiListPage: result})
 }
 
 func (a *App) apiDetail(w http.ResponseWriter, r *http.Request) {
@@ -207,13 +274,15 @@ func (a *App) apiDetail(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) apiIndex(w http.ResponseWriter, r *http.Request) {
 	apiJSON(w, http.StatusOK, map[string]any{
-		"name":      "Syscat",
-		"build":     buildinfo.String(),
-		"read_only": true,
+		"name":                 "Syscat",
+		"build":                buildinfo.String(),
+		"read_only":            false,
+		"write_authentication": "trusted_network",
 		"links": map[string]string{
-			"self":    "/api",
-			"assets":  "/api/assets",
-			"openapi": "/api/openapi.json",
+			"self":      "/api",
+			"assets":    "/api/assets",
+			"summaries": "/api/assets?view=summary",
+			"openapi":   "/api/openapi.json",
 		},
 	})
 }
@@ -224,8 +293,15 @@ func (a *App) apiSpec(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) apiMethodNotAllowed(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Allow", "GET, HEAD")
-	apiError(w, http.StatusMethodNotAllowed, "method_not_allowed", "The API supports GET and HEAD requests only.")
+	allow := "GET, HEAD"
+	if r.Pattern == "/api/assets/{id}" {
+		allow = "GET, HEAD, PATCH"
+	}
+	if r.Pattern == "/api/assets/{id}/photos/{photo_id}" {
+		allow = "PATCH"
+	}
+	w.Header().Set("Allow", allow)
+	apiError(w, http.StatusMethodNotAllowed, "method_not_allowed", "This method is not supported by this API endpoint.")
 }
 
 func (a *App) apiNotFound(w http.ResponseWriter, r *http.Request) {

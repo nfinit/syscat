@@ -35,14 +35,15 @@ type session struct {
 const DefaultMaxUploadMiB int64 = 256
 
 type App struct {
-	maxUploadMiB int64
-	store        *Store
-	dir          string
-	templates    *template.Template
-	sessions     map[string]session
-	sessionMu    sync.Mutex
-	writeMu      sync.Mutex
-	handler      http.Handler
+	maxUploadMiB   int64
+	store          *Store
+	dir            string
+	templates      *template.Template
+	sessions       map[string]session
+	sessionMu      sync.Mutex
+	writeMu        sync.Mutex
+	handler        http.Handler
+	apiWritePolicy func(http.ResponseWriter, *http.Request) bool
 }
 
 type page struct {
@@ -88,6 +89,7 @@ func NewWithUploadLimit(dir string, maxUploadMiB int64) (*App, error) {
 		return nil, err
 	}
 	a := &App{maxUploadMiB: maxUploadMiB, store: store, dir: dir, templates: t, sessions: make(map[string]session)}
+	a.apiWritePolicy = trustedAPIWrite
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, "/assets/new", http.StatusSeeOther) })
 	mux.HandleFunc("GET /assets/new", a.newAsset)
@@ -101,7 +103,10 @@ func NewWithUploadLimit(dir string, maxUploadMiB int64) (*App, error) {
 	mux.HandleFunc("GET /api/assets", a.apiList)
 	mux.HandleFunc("/api/assets", a.apiMethodNotAllowed)
 	mux.HandleFunc("GET /api/assets/{id}", a.apiDetail)
+	mux.HandleFunc("PATCH /api/assets/{id}", a.apiWrite(a.apiPatchAsset))
 	mux.HandleFunc("/api/assets/{id}", a.apiMethodNotAllowed)
+	mux.HandleFunc("PATCH /api/assets/{id}/photos/{photo_id}", a.apiWrite(a.apiPatchPhoto))
+	mux.HandleFunc("/api/assets/{id}/photos/{photo_id}", a.apiMethodNotAllowed)
 	mux.HandleFunc("GET /api/openapi.json", a.apiSpec)
 	mux.HandleFunc("/api/openapi.json", a.apiMethodNotAllowed)
 	mux.HandleFunc("/api/", a.apiNotFound)
@@ -445,11 +450,14 @@ func (a *App) update(w http.ResponseWriter, r *http.Request) {
 		formerOverview = current.Photos[0].Path
 	}
 	c.Photos = groupedPhotos(append(remaining, photos...), overview, formerOverview, groupOrder)
-	if err := a.store.UpdateWithPhotoDeletions(c, deleted); err != nil {
+	if err := a.saveAssetEdits(c, deleted); err != nil {
 		removePhotos(a.dir, photos)
 		if errors.Is(err, ErrConflict) {
 			p.Error = err.Error()
 			a.form(w, http.StatusConflict, p)
+		} else if errors.Is(err, errInvalidEdit) {
+			p.Error = err.Error()
+			a.form(w, http.StatusBadRequest, p)
 		} else {
 			a.fail(w, err)
 		}

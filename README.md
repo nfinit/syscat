@@ -134,12 +134,17 @@ schema migrations and rejects unsupported newer schemas.
 
 ## Agent and programmatic access
 
-A read-only JSON API provides paginated search, individual records with original
-intake, and URLs for original photos and thumbnails. No browser session is needed.
+A JSON API provides paginated search, records with original intake, and photo URLs.
+PATCH endpoints edit current descriptions, locations, captions, and groups using
+asset revision checks and stable photo IDs. Access currently uses the trusted
+network without credentials or browser sessions; write routes share a policy
+that can enforce authentication later.
 
 ```sh
 curl http://127.0.0.1:8800/api/assets/1
 curl 'http://127.0.0.1:8800/api/assets?q=00001&page_size=10'
+curl 'http://127.0.0.1:8800/api/assets?view=summary&page_size=100'
+curl 'http://127.0.0.1:8800/api/assets?view=summary&field=title&q=Apple'
 ```
 
 See [API documentation](docs/api.md). The embedded OpenAPI description is served

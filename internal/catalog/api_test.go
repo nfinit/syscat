@@ -140,7 +140,7 @@ func TestAPIReadsSearchAndPagination(t *testing.T) {
 	}
 }
 
-func TestAPIRejectsInvalidRequestsAndWrites(t *testing.T) {
+func TestAPIRejectsInvalidRequestsAndUnsupportedMethods(t *testing.T) {
 	app, b, _ := start(t)
 	id, err := app.store.Create(Asset{Description: "Preserved system"}, randomKey())
 	if err != nil || id != 1 {
@@ -183,10 +183,14 @@ func TestAPIRejectsInvalidRequestsAndWrites(t *testing.T) {
 	for _, method := range []string{"POST", "PUT", "PATCH", "DELETE", "OPTIONS"} {
 		for _, path := range []string{"/api", "/api/", "/api/assets", "/api/assets/1", "/api/openapi.json"} {
 			result := b.request(method, path, "application/json", strings.NewReader(`{"description":"Overwrite attempt"}`))
+			if method == "PATCH" && path == "/api/assets/1" {
+				expect(t, result, 400)
+				continue
+			}
 			expect(t, result, http.StatusMethodNotAllowed)
 			var response apiErrorResponse
 			readAPI(t, result, &response)
-			if response.Error.Code != "method_not_allowed" || result.Header().Get("Allow") != "GET, HEAD" {
+			if response.Error.Code != "method_not_allowed" || result.Header().Get("Allow") != map[bool]string{true: "GET, HEAD, PATCH", false: "GET, HEAD"}[path == "/api/assets/1"] {
 				t.Fatalf("incorrect method response: %+v", response)
 			}
 		}
@@ -279,13 +283,14 @@ func TestAPIDiscoveryFromHomePage(t *testing.T) {
 		result := b.get(path)
 		expect(t, result, 200)
 		var index struct {
-			Name     string            `json:"name"`
-			Build    string            `json:"build"`
-			ReadOnly bool              `json:"read_only"`
-			Links    map[string]string `json:"links"`
+			Name                string            `json:"name"`
+			Build               string            `json:"build"`
+			ReadOnly            bool              `json:"read_only"`
+			WriteAuthentication string            `json:"write_authentication"`
+			Links               map[string]string `json:"links"`
 		}
 		readAPI(t, result, &index)
-		if index.Name != "Syscat" || index.Build == "" || !index.ReadOnly || index.Links["self"] != "/api" || index.Links["assets"] != "/api/assets" || index.Links["openapi"] != "/api/openapi.json" {
+		if index.Name != "Syscat" || index.Build == "" || index.ReadOnly || index.WriteAuthentication != "trusted_network" || index.Links["self"] != "/api" || index.Links["assets"] != "/api/assets" || index.Links["openapi"] != "/api/openapi.json" {
 			t.Fatalf("invalid API index: %+v", index)
 		}
 		if result.Header().Get("Link") != expectedLink {
