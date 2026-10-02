@@ -19,7 +19,7 @@
     <div class="record-summary">
       <a class="record-id" href="/assets/{{.ID}}">{{.Label}}</a>
       <h2><a href="/assets/{{.ID}}">{{.Title}}</a></h2>
-      <p class="record-location">{{if .Location}}{{.Location}}{{else}}Location not recorded{{end}}</p>
+      {{if .Location}}<p class="record-location">{{.Location}}</p>{{end}}
     </div>
     <a class="record-open" href="/assets/{{.ID}}" aria-label="Open {{.Label}}">View </a>
   </article>{{end}}
