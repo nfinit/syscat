@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Show location and photo group suggestions only after a nonblank character is
+  entered; clearing the field closes suggestions, including keyboard selection.
+  A leading space requests all existing values without changing the typed text.
 - Neutralize the dark page background to charcoal and soften blue tones in text,
   borders, and secondary surfaces, retaining subtle blue-gray forms and blue accents.
 

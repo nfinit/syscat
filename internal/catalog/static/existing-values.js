@@ -39,6 +39,14 @@
             field.setAttribute("aria-expanded", "false");
         }
         function show() {
+            // A leading space deliberately requests every existing value.
+            var showAll = field.value.charAt(0) === " ";
+            var query = field.value.replace(/^\s+|\s+$/g, "").toLowerCase();
+            if (!showAll && !query) {
+                close();
+                matches = [];
+                return;
+            }
             if (values) {
                 var names = values();
                 list.textContent = "";
@@ -51,10 +59,9 @@
                 options = list.querySelectorAll("li");
                 wireOptions();
             }
-            var query = field.value.toLowerCase();
             matches = [];
             for (var j = 0; j < options.length; j++) {
-                var match = options[j].textContent.toLowerCase().indexOf(query) >= 0;
+                var match = showAll || options[j].textContent.toLowerCase().indexOf(query) >= 0;
                 options[j].style.display = match ? "block" : "none";
                 if (match) { matches.push(options[j]); }
             }
