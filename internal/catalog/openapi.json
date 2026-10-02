@@ -1064,7 +1064,7 @@
           "description": {
             "type": "string",
             "deprecated": true,
-            "description": "Legacy combined description compatibility field. Read projection combines short_description and details; migrated records retain original text until a text edit. On writes, split first line into short_description and the remainder into details. Limited to 20,000 UTF-8 bytes; do not mix with either new field."
+            "description": "Legacy combined description compatibility field. Read projection is derived from short_description and details using a single LF separator when details are nonempty; original intake retains its original text. On writes, split first line into short_description and the remainder into details. Limited to 20,000 UTF-8 bytes; do not mix with either new field."
           },
           "location": {
             "type": "string"
@@ -1328,7 +1328,7 @@
           },
           "description": {
             "type": "string",
-            "description": "Legacy combined description compatibility field. Read projection combines short_description and details; migrated records retain original text until a text edit. On writes, split first line into short_description and the remainder into details. Limited to 20,000 UTF-8 bytes; do not mix with either new field.",
+            "description": "Legacy combined description compatibility field. Read projection is derived from short_description and details using a single LF separator when details are nonempty; original intake retains its original text. On writes, split first line into short_description and the remainder into details. Limited to 20,000 UTF-8 bytes; do not mix with either new field.",
             "deprecated": true
           },
           "location": {
@@ -1593,7 +1593,7 @@
           "description": {
             "type": "string",
             "minLength": 1,
-            "description": "Legacy combined description compatibility field. Read projection combines short_description and details; migrated records retain original text until a text edit. On writes, split first line into short_description and the remainder into details. Limited to 20,000 UTF-8 bytes; do not mix with either new field.",
+            "description": "Legacy combined description compatibility field. Read projection is derived from short_description and details using a single LF separator when details are nonempty; original intake retains its original text. On writes, split first line into short_description and the remainder into details. Limited to 20,000 UTF-8 bytes; do not mix with either new field.",
             "deprecated": true
           },
           "location": {

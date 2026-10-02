@@ -16,6 +16,9 @@ func splitDescription(value string) (string, string) {
 	return short, parts[1]
 }
 
+// Match combinedDescription when searching without loading the full record.
+const descriptionSQL = `(short_description || CASE WHEN details='' THEN '' ELSE char(10) || details END)`
+
 func combinedDescription(short, details string) string {
 	if details == "" {
 		return short

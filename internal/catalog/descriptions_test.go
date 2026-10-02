@@ -7,9 +7,71 @@ import (
 	"fmt"
 	"net/url"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
+
+func TestDropDescriptionColumnPreservesSplitRecords(t *testing.T) {
+	dir := t.TempDir()
+	db, err := sql.Open("sqlite", filepath.Join(dir, "syscat.sqlite3"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 1; i <= 6; i++ {
+		script, err := migrations.ReadFile(fmt.Sprintf("migrations/%03d.sql", i))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Exec(string(script)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	intake := `{"description":"Original title\r\nOriginal notes","photos":[]}`
+	// Split fields are authoritative, even if an obsolete combined value differs.
+	if _, err := db.Exec(`INSERT INTO assets(id,description,short_description,details,location,photos,intake,created_at,updated_at,revision,archived,submission_key)
+		VALUES(4,'Old title\nOld notes','Current title',?,'Office','[]',?,'created','updated',9,1,'private-key');
+		UPDATE asset_id_allocator SET next_id=5; PRAGMA user_version=6`, "\r\nIndented notes:\n  line one\n", intake); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	s, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { s.Close() }()
+	asset, err := s.Get(4)
+	if err != nil || asset.ShortDescription != "Current title" || asset.Details != "\r\nIndented notes:\n  line one\n" || asset.Description != combinedDescription(asset.ShortDescription, asset.Details) || string(asset.Intake) != intake || asset.Revision != 9 || !asset.Archived || asset.Location != "Office" || asset.CreatedAt != "created" || asset.UpdatedAt != "updated" {
+		t.Fatal("migration changed stored observations", asset, err)
+	}
+	var count int
+	if err := s.db.QueryRow("SELECT count(*) FROM pragma_table_info('assets') WHERE name='description'").Scan(&count); err != nil || count != 0 {
+		t.Fatal("legacy column remains", count, err)
+	}
+	for _, field := range []string{"description", "all"} {
+		full, total, err := s.listWithField("title\n\r\nIndented", true, 20, 0, field)
+		if err != nil || total != 1 || full[0].ID != 4 {
+			t.Fatal("derived description search failed", full, total, err)
+		}
+		summaries, total, err := s.listSummariesWithField("title\n\r\nIndented", true, 20, 0, field)
+		if err != nil || total != 1 || summaries[0].Title != asset.Title() {
+			t.Fatal("summary search diverged", summaries, total, err)
+		}
+	}
+	s.Close()
+	s, err = Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	after, err := s.Get(4)
+	if err != nil || !reflect.DeepEqual(asset, after) {
+		t.Fatal("migration repeated", after, err)
+	}
+	id, err := s.Create(Asset{ShortDescription: "Next", Details: "New notes"}, randomKey())
+	if err != nil || id != 5 {
+		t.Fatal("allocator changed", id, err)
+	}
+}
 
 func TestDescriptionSplitMigrationPreservesLegacyRecords(t *testing.T) {
 	dir := t.TempDir()
@@ -49,15 +111,15 @@ func TestDescriptionSplitMigrationPreservesLegacyRecords(t *testing.T) {
 			t.Fatal(err)
 		}
 		short, details := splitDescription(description)
-		if asset.Description != description || asset.ShortDescription != short || asset.Details != details || string(asset.Intake) != intake || asset.CatalogNumber != int64(i+101) || asset.Revision != 9 || asset.CreatedAt != "created" || asset.UpdatedAt != "updated" || asset.Archived != (i%2 == 1) {
+		if asset.Description != combinedDescription(short, details) || asset.ShortDescription != short || asset.Details != details || string(asset.Intake) != intake || asset.CatalogNumber != int64(i+101) || asset.Revision != 9 || asset.CreatedAt != "created" || asset.UpdatedAt != "updated" || asset.Archived != (i%2 == 1) {
 			t.Fatal("migration rewrote legacy data", asset)
 		}
 	}
 	var version int
-	if err := store.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 6 {
+	if err := store.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 7 {
 		t.Fatal(version, err)
 	}
-	// A non-text edit must preserve the exact legacy combined representation too.
+	// A non-text edit must preserve the derived representation and original notes.
 	asset, _ := store.Get(103)
 	asset.Location = "Shelf"
 	if err := store.Update(asset); err != nil {

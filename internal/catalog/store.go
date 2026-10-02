@@ -40,7 +40,7 @@ func (p Photo) ID() string {
 type Asset struct {
 	ID               int64           `json:"id"`
 	CatalogNumber    int64           `json:"catalog_number,omitempty"`
-	Description      string          `json:"description"`
+	Description      string          `json:"description"` // Derived compatibility field; not stored as a column.
 	ShortDescription string          `json:"short_description"`
 	Details          string          `json:"details"`
 	Location         string          `json:"location"`
@@ -104,10 +104,10 @@ func (s *Store) initialize() error {
 	if err := tx.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
 		return err
 	}
-	if version > 6 {
-		return fmt.Errorf("database schema %d is newer than this Syscat supports (6)", version)
+	if version > 7 {
+		return fmt.Errorf("database schema %d is newer than this Syscat supports (7)", version)
 	}
-	for next := version + 1; next <= 6; next++ {
+	for next := version + 1; next <= 7; next++ {
 		script, err := migrations.ReadFile(fmt.Sprintf("migrations/%03d.sql", next))
 		if err != nil {
 			return err
@@ -122,20 +122,21 @@ func (s *Store) initialize() error {
 	return tx.Commit()
 }
 
-const columns = `id, id, description, short_description, details, location, photos, created_at, updated_at, revision, archived, intake`
+const columns = `id, id, short_description, details, location, photos, created_at, updated_at, revision, archived, intake`
 
 type scanner interface{ Scan(...any) error }
 
 func scanAsset(row scanner) (Asset, error) {
 	var c Asset
 	var photos, intake string
-	err := row.Scan(&c.ID, &c.CatalogNumber, &c.Description, &c.ShortDescription, &c.Details, &c.Location, &photos, &c.CreatedAt, &c.UpdatedAt, &c.Revision, &c.Archived, &intake)
+	err := row.Scan(&c.ID, &c.CatalogNumber, &c.ShortDescription, &c.Details, &c.Location, &photos, &c.CreatedAt, &c.UpdatedAt, &c.Revision, &c.Archived, &intake)
 	if err != nil {
 		return c, err
 	}
 	if err := json.Unmarshal([]byte(photos), &c.Photos); err != nil {
 		return c, err
 	}
+	c.projectDescription()
 	c.Intake = json.RawMessage(intake)
 	return c, nil
 }
@@ -192,7 +193,7 @@ func (s *Store) Create(c Asset, key string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	if _, err := tx.Exec(`INSERT INTO assets(id, description, short_description, details, location, photos, intake, created_at, updated_at, submission_key) VALUES(?,?,?,?,?,?,?,?,?,?)`, id, c.Description, c.ShortDescription, c.Details, c.Location, string(photos), string(intake), now, now, key); err != nil {
+	if _, err := tx.Exec(`INSERT INTO assets(id, short_description, details, location, photos, intake, created_at, updated_at, submission_key) VALUES(?,?,?,?,?,?,?,?,?)`, id, c.ShortDescription, c.Details, c.Location, string(photos), string(intake), now, now, key); err != nil {
 		return 0, err
 	}
 	next = id
@@ -241,7 +242,7 @@ func (s *Store) update(c Asset, intake any) error {
 	if err != nil {
 		return err
 	}
-	result, err := s.db.Exec(`UPDATE assets SET description=?, short_description=?, details=?, location=?, photos=?, intake=COALESCE(?, intake), updated_at=?, revision=revision+1 WHERE id=? AND revision=? AND archived=0`, c.Description, c.ShortDescription, c.Details, c.Location, string(photos), intake, time.Now().UTC().Format(time.RFC3339Nano), c.ID, c.Revision)
+	result, err := s.db.Exec(`UPDATE assets SET short_description=?, details=?, location=?, photos=?, intake=COALESCE(?, intake), updated_at=?, revision=revision+1 WHERE id=? AND revision=? AND archived=0`, c.ShortDescription, c.Details, c.Location, string(photos), intake, time.Now().UTC().Format(time.RFC3339Nano), c.ID, c.Revision)
 	if err != nil {
 		return err
 	}
@@ -278,7 +279,10 @@ func assetSearchWhere(query string, archived bool, field string) (string, []any)
 		case "title":
 			where += ` AND short_description LIKE ? ESCAPE '\'`
 			args = append(args, pattern)
-		case "short_description", "details", "description", "location":
+		case "description":
+			where += ` AND ` + descriptionSQL + ` LIKE ? ESCAPE '\'`
+			args = append(args, pattern)
+		case "short_description", "details", "location":
 			// The column name comes only from these fixed choices.
 			where += ` AND ` + field + ` LIKE ? ESCAPE '\'`
 			args = append(args, pattern)
@@ -289,7 +293,7 @@ func assetSearchWhere(query string, archived bool, field string) (string, []any)
 			where += ` AND id=?`
 			args = append(args, id)
 		default:
-			where += ` AND ((description || ' ' || location) LIKE ? ESCAPE '\' OR id=? OR EXISTS (SELECT 1 FROM json_each(assets.photos) AS photo WHERE json_extract(photo.value, '$.caption') LIKE ? ESCAPE '\'))`
+			where += ` AND ((` + descriptionSQL + ` || ' ' || location) LIKE ? ESCAPE '\' OR id=? OR EXISTS (SELECT 1 FROM json_each(assets.photos) AS photo WHERE json_extract(photo.value, '$.caption') LIKE ? ESCAPE '\'))`
 			args = append(args, pattern, id, pattern)
 		}
 	}
@@ -344,7 +348,7 @@ func (s *Store) listSummariesWithField(query string, archived bool, limit, offse
 		return nil, 0, err
 	}
 	args = append(args, limit, offset)
-	rows, err := s.db.Query(`SELECT id, id, short_description, description='', revision, COALESCE(json_array_length(photos),0), archived FROM assets`+where+" ORDER BY id DESC LIMIT ? OFFSET ?", args...)
+	rows, err := s.db.Query(`SELECT id, id, short_description, (short_description='' AND details=''), revision, COALESCE(json_array_length(photos),0), archived FROM assets`+where+" ORDER BY id DESC LIMIT ? OFFSET ?", args...)
 	if err != nil {
 		return nil, 0, err
 	}

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.8.0 - 2026-10-02
+
+- Drop the redundant combined-description column in schema 7. Read and search
+  the deprecated API/export `description` as a projection of short description
+  and details. Preserve split fields and original intake snapshots, including
+  body formatting; the compatibility projection uses an LF title/body separator.
+
 ## 1.7.3 - 2026-10-02
 
 - Add schema-6 intake allocation independent of editable IDs: high vanity IDs no

@@ -144,7 +144,10 @@ Schema 5 adds transactional ID-change history without changing existing records.
 [Backend history queries](docs/id-history.md) can trace assets through later swaps;
 previous changes are not reconstructed.
 The schema-3 description migration runs once at startup, splitting existing text
-at the first newline without rewriting original intake. Early testers can build
+at the first newline without rewriting original intake. Schema 7 removes the
+redundant combined-description column; API/export compatibility values and
+searches derive it from the split fields, preserving all stored notes and intake.
+Early testers can build
 the updated executable and start it with their existing `--data-dir`.
 
 ## Agent and programmatic access

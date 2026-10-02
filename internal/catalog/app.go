@@ -406,11 +406,7 @@ func (a *App) update(w http.ResponseWriter, r *http.Request) {
 		if normalizedFormText(c.Details) == normalizedFormText(current.Details) {
 			c.Details = current.Details
 		}
-		if c.ShortDescription == current.ShortDescription && c.Details == current.Details {
-			c.Description = current.Description
-		} else {
-			c.projectDescription()
-		}
+		c.projectDescription()
 	}
 	c.CatalogNumber = current.CatalogNumber
 	c.ID, c.Photos = current.ID, append([]Photo(nil), current.Photos...)

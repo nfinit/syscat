@@ -394,6 +394,15 @@ Summaries continue to omit long notes. Display title retains its existing
 120-character truncation; the full short-description field and field searches
 preserve all text.
 
+Schema 7 drops the redundant stored `description` column. The independent
+`short_description` and `details` fields remain authoritative and are unchanged,
+as are original intake JSON, IDs, revisions, timestamps, photo references, ID
+history, and the intake allocator. Combined description reads and searches now
+derive their value from these fields, joining nonempty details with a single LF
+separator. Legacy CRLF first-line separators and an empty trailing separator
+are therefore normalized in this compatibility value; body formatting is kept.
+Original intake snapshots retain their original text.
+
 The combined `description` field remains a deprecated compatibility projection.
 Early clients may still create or PATCH it; the first line replaces the short
 description and the rest replaces details, so those writes affect both fields.

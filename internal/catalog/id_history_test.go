@@ -163,7 +163,7 @@ func TestIDHistoryMigrationPreservesExistingRecords(t *testing.T) {
 	}
 	var version int
 	store.db.QueryRow("PRAGMA user_version").Scan(&version)
-	if version != 6 {
+	if version != 7 {
 		t.Fatal(version)
 	}
 }

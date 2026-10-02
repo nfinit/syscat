@@ -368,7 +368,7 @@ func TestPhotoEXIFOrientation(t *testing.T) {
 
 func TestRejectNewerSchema(t *testing.T) {
 	app, _, dir := start(t)
-	if _, err := app.store.db.Exec("PRAGMA user_version=7"); err != nil {
+	if _, err := app.store.db.Exec("PRAGMA user_version=8"); err != nil {
 		t.Fatal(err)
 	}
 	app.Close()
