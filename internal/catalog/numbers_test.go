@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"path/filepath"
 	"reflect"
@@ -14,26 +15,29 @@ import (
 	"testing"
 )
 
-func TestCatalogNumberMigrationPreservesInventory(t *testing.T) {
+func TestSingleIDMigrationPreservesInventory(t *testing.T) {
 	dir := t.TempDir()
 	db, err := sql.Open("sqlite", filepath.Join(dir, "syscat.sqlite3"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	script, err := migrations.ReadFile("migrations/001.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.Exec(string(script)); err != nil {
-		t.Fatal(err)
-	}
-	intake := `{"id":0,"description":"Original observations","photos":[],"revision":1}`
-	for _, id := range []int64{1, 9} {
-		if _, err := db.Exec(`INSERT INTO assets(id,description,location,photos,intake,created_at,updated_at,revision,archived,submission_key) VALUES(?,?,?,'[]',?,'created','updated',7,?,?)`, id, fmt.Sprintf("Record %d", id), "Office", intake, id == 9, fmt.Sprint(id)); err != nil {
+	for _, file := range []string{"001.sql", "002.sql", "003.sql"} {
+		script, err := migrations.ReadFile("migrations/" + file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = db.Exec(string(script)); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, err := db.Exec("PRAGMA user_version=1"); err != nil {
+	intake := `{"id":0,"catalog_number":9,"description":"Original observations","photos":[],"revision":1}`
+	for _, pair := range [][2]int64{{1, 3}, {3, 1}, {9, 100}} {
+		_, err = db.Exec(`INSERT INTO assets(id,catalog_number,description,short_description,details,location,photos,intake,created_at,updated_at,revision,archived,submission_key) VALUES(?,?,?,?,'Exact details','Office','[]',?,'created','updated',7,?,?)`, pair[0], pair[1], fmt.Sprintf("Record %d\nExact details", pair[0]), fmt.Sprintf("Record %d", pair[0]), intake, pair[0] == 9, fmt.Sprint(pair[0]))
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err = db.Exec("PRAGMA user_version=3; UPDATE sqlite_sequence SET seq=50 WHERE name='assets'"); err != nil {
 		t.Fatal(err)
 	}
 	db.Close()
@@ -41,26 +45,37 @@ func TestCatalogNumberMigrationPreservesInventory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, id := range []int64{1, 9} {
-		asset, err := store.Get(id)
+	for _, pair := range [][2]int64{{1, 3}, {3, 1}, {9, 100}} {
+		c, err := store.Get(pair[1])
 		if err != nil {
 			t.Fatal(err)
 		}
-		if asset.ID != id || asset.CatalogNumber != id || asset.Revision != 7 || string(asset.Intake) != intake || asset.Location != "Office" || asset.Archived != (id == 9) || asset.CreatedAt != "created" || asset.UpdatedAt != "updated" {
-			t.Fatal("migration rewrote inventory", asset)
+		if c.ID != pair[1] || c.CatalogNumber != c.ID || c.ShortDescription != fmt.Sprintf("Record %d", pair[0]) || c.Details != "Exact details" || c.Revision != 7 || c.Location != "Office" || c.Archived != (pair[0] == 9) || c.CreatedAt != "created" || c.UpdatedAt != "updated" || string(c.Intake) != intake {
+			t.Fatal("migration lost observations", c)
 		}
 	}
 	var version int
-	if err := store.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 3 {
-		t.Fatal(version, err)
+	store.db.QueryRow("PRAGMA user_version").Scan(&version)
+	if version != 6 {
+		t.Fatal(version)
 	}
+	rows, err := store.db.Query("PRAGMA table_info(assets)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var n, required, primary int
+		var name, kind string
+		var value any
+		rows.Scan(&n, &name, &kind, &required, &value, &primary)
+		if name == "catalog_number" {
+			t.Fatal("separate number column remains")
+		}
+	}
+	rows.Close()
 	id, err := store.Create(Asset{Description: "New intake"}, randomKey())
 	if err != nil || id != 10 {
-		t.Fatal("sequence changed", id, err)
-	}
-	asset, _ := store.Get(id)
-	if asset.CatalogNumber != 10 {
-		t.Fatal(asset)
+		t.Fatal("sequence collision", id, err)
 	}
 	store.Close()
 	store, err = Open(dir)
@@ -68,9 +83,17 @@ func TestCatalogNumberMigrationPreservesInventory(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	asset, _ = store.Get(9)
-	if asset.CatalogNumber != 9 || string(asset.Intake) != intake {
-		t.Fatal("reopen changed migration")
+	c, _ := store.Get(1)
+	if c.ShortDescription != "Record 3" || string(c.Intake) != intake {
+		t.Fatal("migration repeated", c)
+	}
+	// Moving an ID never changes the intake counter.
+	if _, _, err = store.Renumber(10, 1, 50, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	id, err = store.Create(Asset{Description: "Next intake"}, randomKey())
+	if err != nil || id != 11 {
+		t.Fatal(id, err)
 	}
 }
 
@@ -83,218 +106,176 @@ func numberFixture(t *testing.T) (*App, *browser, string) {
 	}
 	return app, b, dir
 }
+func renumberAPI(b *browser, path, body string) *httptest.ResponseRecorder {
+	return b.request("POST", path, "application/json", strings.NewReader(body))
+}
 
-func TestAPICatalogSwapSearchAndStableLinks(t *testing.T) {
+func TestAPISingleIDSwapAndBreakingLinks(t *testing.T) {
 	app, b, dir := numberFixture(t)
-	before1, _ := app.store.Get(1)
-	before3, _ := app.store.Get(3)
+	first, _ := app.store.Get(1)
+	source, _ := app.store.Get(3)
 	files := photoFiles(t, dir)
 	var old apiAsset
 	readAPI(t, b.get("/api/assets/3"), &old)
-	response := b.request("POST", "/api/assets/3/catalog-number", "application/json", strings.NewReader(`{"revision":1,"catalog_number":1,"swap_id":1,"swap_revision":1}`))
+	response := renumberAPI(b, "/api/assets/3/id", `{"revision":1,"id":1,"swap_id":1,"swap_revision":1,"acknowledge_link_changes":true}`)
 	expect(t, response, 200)
 	var result apiNumberResult
 	readAPI(t, response, &result)
-	if result.Asset.ID != 3 || result.Asset.CatalogNumber != 1 || result.Asset.Label != "00001" || result.Asset.Revision != 2 || result.SwappedAsset == nil || result.SwappedAsset.ID != 1 || result.SwappedAsset.CatalogNumber != 3 || result.SwappedAsset.Revision != 2 {
+	if result.Asset.ID != 1 || result.Asset.CatalogNumber != 1 || result.Asset.Revision != 2 || result.Asset.URL != "/assets/1" || result.Asset.IDChangeURL != "/api/assets/1/id" || response.Header().Get("Location") != "/api/assets/1" || result.SwappedAsset == nil || result.SwappedAsset.ID != 3 || result.SwappedAsset.Revision != 2 {
 		t.Fatal(result)
 	}
-	if result.Asset.APIURL != old.APIURL || result.Asset.URL != old.URL || result.Asset.PhotoUploadURL != old.PhotoUploadURL || !reflect.DeepEqual(result.Asset.Photos, old.Photos) || string(result.Asset.Intake) != string(old.Intake) {
-		t.Fatal("swap changed identity or photos/intake")
+	for i := range old.Photos {
+		old.Photos[i].APIURL = result.Asset.Photos[i].APIURL
 	}
-	for _, before := range []Asset{before1, before3} {
-		after, err := app.store.Get(before.ID)
-		if err != nil {
-			t.Fatal(err)
+	if !reflect.DeepEqual(result.Asset.Photos, old.Photos) || string(result.Asset.Intake) != string(old.Intake) {
+		t.Fatal("photo/intake identity changed")
+	}
+	for _, before := range []Asset{first, source} {
+		target := int64(3)
+		if before.ID == 3 {
+			target = 1
 		}
+		after, _ := app.store.Get(target)
 		expected := before
-		expected.CatalogNumber = after.CatalogNumber
+		expected.ID = target
+		expected.CatalogNumber = target
 		expected.Revision++
 		expected.UpdatedAt = after.UpdatedAt
 		if !reflect.DeepEqual(expected, after) {
-			t.Fatal("swap modified observations", after)
+			t.Fatal("observations changed", after)
 		}
+	}
+	var oldLink apiAsset
+	readAPI(t, b.get(old.APIURL), &oldLink)
+	if oldLink.ShortDescription != first.ShortDescription {
+		t.Fatal("old link not reassigned")
 	}
 	if !reflect.DeepEqual(files, photoFiles(t, dir)) {
-		t.Fatal("swap changed files")
+		t.Fatal("files changed")
 	}
-	expect(t, b.get(old.URL), 200)
 	for _, view := range []string{"full", "summary"} {
-		var listing struct {
-			Assets []struct {
-				ID, CatalogNumber int64
-				Label             string
+		for _, field := range []string{"id", "catalog_number"} {
+			var list struct {
+				Assets []apiAsset
+				Total  int
 			}
-			Total int
-		}
-		// Use raw wire names for the underscore-delimited field.
-		var raw struct {
-			Assets []struct {
-				ID     int64 `json:"id"`
-				Number int64 `json:"catalog_number"`
-				Label  string
-			}
-			Total int
-		}
-		readAPI(t, b.get("/api/assets?view="+view), &raw)
-		if len(raw.Assets) != 3 || raw.Assets[0].ID != 1 || raw.Assets[0].Number != 3 || raw.Assets[2].ID != 3 || raw.Assets[2].Label != "00001" {
-			t.Fatal("catalog ordering/summary incorrect", raw)
-		}
-		for _, tc := range []struct {
-			field string
-			id    int64
-		}{{"catalog_number", 3}, {"id", 1}} {
-			readAPI(t, b.get("/api/assets?view="+view+"&field="+tc.field+"&q=00001"), &listing)
-			if listing.Total != 1 || listing.Assets[0].ID != tc.id {
-				t.Fatal("number/ID search conflated", listing)
+			readAPI(t, b.get("/api/assets?view="+view+"&field="+field+"&q=00001"), &list)
+			if list.Total != 1 || list.Assets[0].ID != 1 || list.Assets[0].Title != source.Title() {
+				t.Fatal(list)
 			}
 		}
-	}
-	expect(t, b.request("PATCH", old.APIURL, "application/json", strings.NewReader(`{"revision":1,"location":"Stale"}`)), 409)
-	expect(t, b.request("PATCH", old.APIURL, "application/json", strings.NewReader(`{"revision":2,"location":"Shelf"}`)), 200)
-	current, _ := app.store.Get(3)
-	if current.CatalogNumber != 1 {
-		t.Fatal("ordinary edit reverted numbering")
-	}
-	var exported []Asset
-	readAPI(t, b.get("/export/assets.json"), &exported)
-	if exported[0].ID != 1 || exported[0].CatalogNumber != 3 || exported[2].ID != 3 || exported[2].CatalogNumber != 1 {
-		t.Fatal("JSON export lost identity/number")
 	}
 	rows, err := csv.NewReader(b.get("/export/assets.csv").Body).ReadAll()
+	if err != nil || rows[1][0] != "3" || rows[1][1] != "00003" || rows[1][8] != "3" {
+		t.Fatal(rows, err)
+	}
+	// A move vacates the old URL, and idempotent intake still finds the same asset.
+	moved := renumberAPI(b, "/api/assets/1/catalog-number", `{"revision":2,"catalog_number":20,"acknowledge_link_changes":true}`)
+	expect(t, moved, 200)
+	expect(t, b.get("/assets/1"), 404)
+	c, _ := app.store.Get(20)
+	if c.ShortDescription != source.ShortDescription {
+		t.Fatal(c)
+	}
+	var key string
+	app.store.db.QueryRow("SELECT submission_key FROM assets WHERE id=20").Scan(&key)
+	replay, err := app.store.BySubmission(key)
+	if err != nil || replay.ID != 20 {
+		t.Fatal(replay, err)
+	}
+	expect(t, b.request("PATCH", "/api/assets/20", "application/json", strings.NewReader(`{"revision":3,"details":"New research"}`)), 200)
+	expect(t, b.request("GET", "/api/assets/20/id", "", nil), 405)
+}
+
+func TestSingleIDGuardsRollbackAndAllocation(t *testing.T) {
+	app, b, _ := numberFixture(t)
+	for _, body := range []string{`{"revision":1,"id":1}`, `{"revision":1,"id":1,"acknowledge_link_changes":false}`, `{"revision":1,"id":1,"acknowledge_link_changes":"true"}`, `{"revision":1,"id":1,"catalog_number":1,"acknowledge_link_changes":true}`, `{"revision":1,"id":0,"acknowledge_link_changes":true}`, `{"revision":1,"id":1,"swap_id":1,"acknowledge_link_changes":true}`, `{"revision":1,"id":9223372036854775808,"acknowledge_link_changes":true}`} {
+		expect(t, renumberAPI(b, "/api/assets/3/id", body), 400)
+	}
+	for _, body := range []string{`{"revision":1,"id":1,"acknowledge_link_changes":true}`, `{"revision":1,"id":1,"swap_id":2,"swap_revision":1,"acknowledge_link_changes":true}`, `{"revision":1,"id":1,"swap_id":1,"swap_revision":2,"acknowledge_link_changes":true}`, `{"revision":2,"id":1,"swap_id":1,"swap_revision":1,"acknowledge_link_changes":true}`, `{"revision":1,"id":4,"swap_id":1,"swap_revision":1,"acknowledge_link_changes":true}`} {
+		expect(t, renumberAPI(b, "/api/assets/3/id", body), 409)
+	}
+	first, _ := app.store.Get(1)
+	source, _ := app.store.Get(3)
+	_, err := app.store.db.Exec(`CREATE TRIGGER fail_number BEFORE UPDATE OF id ON assets WHEN NEW.id=1 AND OLD.id=-3 BEGIN SELECT RAISE(ABORT,'test swap failure'); END`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rows[0][0] != "id" || rows[0][8] != "catalog_number" || rows[1][0] != "1" || rows[1][1] != "00003" || rows[1][8] != "3" {
-		t.Fatal("CSV identity/number", rows)
-	}
-}
-
-func TestCatalogRenumberGuardsRollbackAndAllocation(t *testing.T) {
-	app, b, _ := numberFixture(t)
-	for _, body := range []string{
-		`{"revision":1,"catalog_number":1}`,
-		`{"revision":1,"catalog_number":1,"swap_id":2,"swap_revision":1}`,
-		`{"revision":1,"catalog_number":1,"swap_id":1,"swap_revision":2}`,
-		`{"revision":2,"catalog_number":1,"swap_id":1,"swap_revision":1}`,
-		`{"revision":1,"catalog_number":4,"swap_id":1,"swap_revision":1}`,
-	} {
-		expect(t, b.request("POST", "/api/assets/3/catalog-number", "application/json", strings.NewReader(body)), 409)
-	}
-	for _, body := range []string{
-		`{"revision":1,"catalog_number":0}`,
-		`{"revision":1,"catalog_number":-1}`,
-		`{"revision":1,"catalog_number":1.5}`,
-		`{"revision":1,"catalog_number":9223372036854775808}`,
-		`{"revision":1,"catalog_number":1,"swap_id":1}`,
-		`{"revision":1,"catalog_number":1,"swap_revision":1}`,
-		`{"revision":1,"catalog_number":1,"swap_id":0,"swap_revision":1}`,
-		`{"revision":1,"catalog_number":1,"swap_id":1,"swap_revision":0}`,
-		`{"revision":1,"catalog_number":null}`,
-		`{"revision":1,"catalog_number":1,"catalog_number":2}`,
-		`{"revision":1,"catalog_number":4,"id":4}`,
-	} {
-		expect(t, b.request("POST", "/api/assets/3/catalog-number", "application/json", strings.NewReader(body)), 400)
-	}
-	before1, _ := app.store.Get(1)
-	before3, _ := app.store.Get(3)
-	if _, err := app.store.db.Exec(`CREATE TRIGGER fail_number BEFORE UPDATE OF catalog_number ON assets WHEN NEW.catalog_number=1 AND NEW.id=3 BEGIN SELECT RAISE(ABORT,'test swap failure'); END`); err != nil {
-		t.Fatal(err)
-	}
-	expect(t, b.request("POST", "/api/assets/3/catalog-number", "application/json", strings.NewReader(`{"revision":1,"catalog_number":1,"swap_id":1,"swap_revision":1}`)), 500)
+	expect(t, renumberAPI(b, "/api/assets/3/id", `{"revision":1,"id":1,"swap_id":1,"swap_revision":1,"acknowledge_link_changes":true}`), 500)
 	after1, _ := app.store.Get(1)
 	after3, _ := app.store.Get(3)
-	if !reflect.DeepEqual(before1, after1) || !reflect.DeepEqual(before3, after3) {
-		t.Fatal("partial swap committed")
+	if !reflect.DeepEqual(first, after1) || !reflect.DeepEqual(source, after3) {
+		t.Fatal("partial swap")
 	}
-	if _, err := app.store.db.Exec("DROP TRIGGER fail_number"); err != nil {
-		t.Fatal(err)
-	}
-	expect(t, b.request("POST", "/api/assets/3/catalog-number", "application/json", strings.NewReader(`{"revision":1,"catalog_number":3}`)), 200)
+	app.store.db.Exec("DROP TRIGGER fail_number")
+	expect(t, renumberAPI(b, "/api/assets/3/id", `{"revision":1,"id":3,"acknowledge_link_changes":true}`), 200)
 	after3, _ = app.store.Get(3)
-	if !reflect.DeepEqual(before3, after3) {
-		t.Fatal("no-op advanced revision")
+	if !reflect.DeepEqual(source, after3) {
+		t.Fatal("no-op changed revision")
 	}
-	// Archived numbers remain occupied and can be exchanged explicitly.
-	if err := app.store.Archive(1, 1, true); err != nil {
+	if err = app.store.Archive(1, 1, true); err != nil {
 		t.Fatal(err)
 	}
-	expect(t, b.request("POST", "/api/assets/1/catalog-number", "application/json", strings.NewReader(`{"revision":2,"catalog_number":4}`)), 409)
-	expect(t, b.request("POST", "/api/assets/3/catalog-number", "application/json", strings.NewReader(`{"revision":1,"catalog_number":1,"swap_id":1,"swap_revision":2}`)), 200)
-	after1, _ = app.store.Get(1)
-	if !after1.Archived || after1.CatalogNumber != 3 || after1.Revision != 3 {
-		t.Fatal(after1)
+	expect(t, renumberAPI(b, "/api/assets/1/id", `{"revision":2,"id":4,"acknowledge_link_changes":true}`), 409)
+	expect(t, renumberAPI(b, "/api/assets/3/id", `{"revision":1,"id":1,"swap_id":1,"swap_revision":2,"acknowledge_link_changes":true}`), 200)
+	archived, _ := app.store.Get(3)
+	if !archived.Archived || archived.Revision != 3 {
+		t.Fatal(archived)
 	}
-	// Reserve the next sequential number, then create a new record without collision.
-	expect(t, b.request("POST", "/api/assets/2/catalog-number", "application/json", strings.NewReader(`{"revision":1,"catalog_number":4}`)), 200)
-	id, err := app.store.Create(Asset{Description: "Fourth"}, randomKey())
+	expect(t, renumberAPI(b, "/api/assets/2/id", `{"revision":1,"id":100,"acknowledge_link_changes":true}`), 200)
+	id, err := app.store.Create(Asset{Description: "Next"}, randomKey())
 	if err != nil || id != 4 {
 		t.Fatal(id, err)
 	}
-	fourth, _ := app.store.Get(4)
-	if fourth.CatalogNumber != 5 {
-		t.Fatal("allocation collided with reserved number", fourth)
-	}
+	c, _ := app.store.Get(id)
 	var intake Asset
-	if err := json.Unmarshal(fourth.Intake, &intake); err != nil || intake.CatalogNumber != 5 {
-		t.Fatal("initial number missing from new intake", intake, err)
+	if err = json.Unmarshal(c.Intake, &intake); err != nil || intake.CatalogNumber != 4 {
+		t.Fatal(intake, err)
 	}
 }
 
-func TestNumberEditorPreviewAndConcurrentChanges(t *testing.T) {
+func TestSingleIDBrowserAcknowledgmentAndConcurrentChanges(t *testing.T) {
 	app, b, _ := numberFixture(t)
-	editor := b.get("/assets/3/catalog-number")
-	expect(t, editor, 200)
-	if !strings.Contains(editor.Body.String(), "Preview change") {
-		t.Fatal("number editor not rendered")
-	}
-	preview := b.post("/assets/3/catalog-number", url.Values{"revision": {"1"}, "catalog_number": {"1"}})
+	preview := b.post("/assets/3/id", url.Values{"revision": {"1"}, "catalog_number": {"1"}})
 	expect(t, preview, 200)
-	if !strings.Contains(preview.Body.String(), "First system") || !strings.Contains(preview.Body.String(), "Swap numbers") || hidden(preview.Body.String(), "swap_id") != "1" || hidden(preview.Body.String(), "swap_revision") != "1" {
-		t.Fatal("swap preview does not identify both records")
+	for _, text := range []string{"First system", "Swap IDs", "Changing IDs breaks existing links", "required", "acknowledge_link_changes"} {
+		if !strings.Contains(preview.Body.String(), text) {
+			t.Fatal("preview missing", text)
+		}
 	}
-	before, _ := app.store.Get(3)
-	if before.CatalogNumber != 3 {
-		t.Fatal("preview performed swap")
-	}
-	expect(t, b.post("/assets/1", url.Values{"revision": {"1"}, "description": {"First system edited"}}), 303)
 	confirm := url.Values{"revision": {"1"}, "catalog_number": {"1"}, "confirm": {"1"}, "swap_id": {"1"}, "swap_revision": {"1"}}
-	expect(t, b.post("/assets/3/catalog-number", confirm), 409)
+	expect(t, b.post("/assets/3/id", confirm), 400)
+	confirm.Set("acknowledge_link_changes", "1")
+	expect(t, b.post("/assets/1", url.Values{"revision": {"1"}, "description": {"First system edited"}}), 303)
+	expect(t, b.post("/assets/3/id", confirm), 409)
 	confirm.Set("swap_revision", "2")
-	response := b.post("/assets/3/catalog-number", confirm)
+	response := b.post("/assets/3/id", confirm)
 	expect(t, response, 303)
-	if response.Header().Get("Location") != "/assets/3?updated=1" {
-		t.Fatal("renumber changed URL")
+	if response.Header().Get("Location") != "/assets/1?updated=1" {
+		t.Fatal(response.Header())
 	}
-	current, _ := app.store.Get(3)
-	if current.CatalogNumber != 1 || current.Revision != 2 {
-		t.Fatal(current)
-	}
-	expect(t, b.post("/assets/3", url.Values{"revision": {"1"}, "description": {"Stale form"}}), 409)
-	expect(t, b.post("/assets/3/catalog-number", url.Values{"csrf": {"wrong"}, "revision": {"2"}, "catalog_number": {"10"}}), 400)
-	expect(t, b.post("/assets/3/catalog-number", url.Values{"revision": {"2"}, "catalog_number": {"0"}}), 400)
-	// Free-number preview includes no swap expectations; a new occupant makes its
-	// confirmation stale rather than being silently displaced.
-	expect(t, b.post("/assets/3/catalog-number", url.Values{"revision": {"2"}, "catalog_number": {"10"}}), 200)
+	// A preview of a free target must not silently swap a new occupant.
+	expect(t, b.post("/assets/1/id", url.Values{"revision": {"2"}, "catalog_number": {"10"}}), 200)
 	if _, _, err := app.store.Renumber(2, 1, 10, 0, 0); err != nil {
 		t.Fatal(err)
 	}
-	expect(t, b.post("/assets/3/catalog-number", url.Values{"revision": {"2"}, "catalog_number": {"10"}, "confirm": {"1"}}), 409)
+	expect(t, b.post("/assets/1/id", url.Values{"revision": {"2"}, "catalog_number": {"10"}, "confirm": {"1"}, "acknowledge_link_changes": {"1"}}), 409)
 	app.apiWritePolicy = func(w http.ResponseWriter, r *http.Request) bool {
 		apiError(w, 403, "forbidden", "test policy")
 		return false
 	}
-	expect(t, b.request("POST", "/api/assets/3/catalog-number", "", nil), 403)
+	expect(t, b.request("POST", "/api/assets/1/id", "", nil), 403)
 	app.apiWritePolicy = trustedAPIWrite
-	statuses := make(chan int, 2)
 	var wg sync.WaitGroup
-	for _, number := range []int{11, 12} {
+	statuses := make(chan int, 2)
+	for _, id := range []int{11, 12} {
 		wg.Add(1)
-		go func(number int) {
+		go func(id int) {
 			defer wg.Done()
 			client := &browser{app: app}
-			result := client.request("POST", "/api/assets/3/catalog-number", "application/json", strings.NewReader(fmt.Sprintf(`{"revision":2,"catalog_number":%d}`, number)))
-			statuses <- result.Code
-		}(number)
+			response := renumberAPI(client, "/api/assets/1/id", fmt.Sprintf(`{"revision":2,"id":%d,"acknowledge_link_changes":true}`, id))
+			statuses <- response.Code
+		}(id)
 	}
 	wg.Wait()
 	close(statuses)
@@ -302,7 +283,12 @@ func TestNumberEditorPreviewAndConcurrentChanges(t *testing.T) {
 	for status := range statuses {
 		counts[status]++
 	}
-	if counts[200] != 1 || counts[409] != 1 {
-		t.Fatal("concurrent renumber lost revision protection", counts)
+	if counts[200] != 1 || counts[404]+counts[409] != 1 {
+		t.Fatal("concurrent moves", counts)
+	}
+	var negative int
+	app.store.db.QueryRow("SELECT count(*) FROM assets WHERE id<1").Scan(&negative)
+	if negative != 0 {
+		t.Fatal("temporary ID escaped transaction")
 	}
 }

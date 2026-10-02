@@ -29,7 +29,8 @@ nav a.active { background: #e7eff7; color: #285574; font-weight: 650; }
 h1 { font-size: 30px; line-height: 1.2; font-weight: 600; margin: 0 0 12px; overflow-wrap: break-word; word-wrap: break-word; }
 h2 { line-height: 1.3; }
 .panel { background: #fbfdff; border: 1px solid #d4e0eb; border-radius: 7px; }
-.entry-form { padding: 28px 30px 0; box-shadow: 0 2px 4px #e3eaf1; }
+.entry-form, .number-form { padding: 28px 30px 0; box-shadow: 0 2px 4px #e3eaf1; }
+.number-form { overflow-wrap: break-word; }
 .section-label { font-size: 10px; letter-spacing: 1.6px; color: #5b748a; font-weight: 700; margin: 0 0 25px; }
 .step { background: #e8f0f8; padding: 4px 6px; margin-right: 9px; border-radius: 3px; letter-spacing: .5px; }
 .section-aside { float: right; letter-spacing: 0; color: #738599; font-weight: normal; font-size: 11px; }
@@ -70,7 +71,7 @@ input[type="file"]::file-selector-button { border: 0; background: #dde9f4; paddi
 .button span { margin-left: 14px; }
 .action-hint { display: inline-block; margin-left: 16px; font-size: 11px; color: #6e8296; }
 .form-actions > a { margin-left: 16px; }
-form.panel:not(.entry-form) > .form-actions { margin-left: 0; margin-right: 0; }
+form.panel:not(.entry-form):not(.number-form) > .form-actions { margin-left: 0; margin-right: 0; }
 .site-footer { max-width: 1108px; padding: 22px 0 35px; margin: 0 auto; border-top: 1px solid #d5e0ea; color: #75879a; font-size: 11px; }
 .site-footer:after { content: ""; display: block; clear: both; }
 .site-footer span { color: #5e748a; font-weight: 700; margin-right: 15px; }
@@ -136,7 +137,7 @@ summary { cursor: pointer; color: #58738c; padding: 4px 0; }
 .archive-status { color: #976b31; }
 @media (max-width: 950px) {
  .brand-caption { display: none; }
- .entry-form { padding-left: 23px; padding-right: 23px; }
+ .entry-form, .number-form { padding-left: 23px; padding-right: 23px; }
  .form-actions { margin-left: -23px; margin-right: -23px; padding-left: 23px; padding-right: 23px; }
  .action-hint { display: block; margin: 10px 0 0; }
  .site-footer { margin-left: 36px; margin-right: 36px; }
@@ -162,7 +163,7 @@ summary { cursor: pointer; color: #58738c; padding: 4px 0; }
  .brand { font-size: 21px; }
  nav a { font-size: 11px; padding: 7px 6px; }
  .shell { padding-left: 14px; padding-right: 14px; }
- .entry-form { padding-left: 19px; padding-right: 19px; }
+ .entry-form, .number-form { padding-left: 19px; padding-right: 19px; }
  .form-actions { margin-left: -19px; margin-right: -19px; padding-left: 19px; padding-right: 19px; }
  .section-aside { display: none; }
  .field-pair .field { font-size: 13px; }
@@ -242,7 +243,8 @@ html[data-theme="dark"] .site-header nav a.active { color: #fff; }
 html[data-theme="dark"] .site-header a:focus { outline-color: #fff; }
 html[data-theme="dark"] .panel,
 html[data-theme="dark"] .record-row { background: #262729; border-color: #3f464f; }
-html[data-theme="dark"] .entry-form { box-shadow: 0 2px 4px #111214; }
+html[data-theme="dark"] .entry-form,
+html[data-theme="dark"] .number-form { box-shadow: 0 2px 4px #111214; }
 html[data-theme="dark"] input[type="text"],
 html[data-theme="dark"] input[type="search"],
 html[data-theme="dark"] textarea,

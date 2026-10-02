@@ -1,20 +1,22 @@
 {{define "number"}}
-<div class="page-heading"><h1>Change catalog number</h1><p><a href="/assets/{{.Asset.ID}}">{{.Asset.Label}} — {{.Asset.Title}}</a></p></div>
-<form method="post" action="/assets/{{.Asset.ID}}/catalog-number" class="panel">
+<div class="page-heading"><h1>Change asset ID</h1><p><a href="/assets/{{.Asset.ID}}">{{.Asset.Label}} — {{.Asset.Title}}</a></p></div>
+<form method="post" action="/assets/{{.Asset.ID}}/id" class="panel number-form">
   <input type="hidden" name="csrf" value="{{.CSRF}}">
   <input type="hidden" name="revision" value="{{.Asset.Revision}}">
   {{if .NumberPreview}}
   <input type="hidden" name="confirm" value="1">
+  <div class="error"><strong>Changing IDs breaks existing links.</strong><p>Saved page and API URLs, bookmarks, and external references will no longer identify the same asset. For a move, the old URL stops working. For a swap, each old URL opens the other asset. Photo file URLs and original intake observations stay unchanged.</p></div>
   <input type="hidden" name="catalog_number" value="{{.NumberTarget}}">
-  <p>{{.Asset.Title}}: {{.Asset.CatalogNumber}} → {{.NumberTarget}}</p>
+  <p>{{.Asset.Title}}: {{.Asset.ID}} → {{.NumberTarget}}</p>
   {{if .NumberOther}}
   <input type="hidden" name="swap_id" value="{{.NumberOther.ID}}">
   <input type="hidden" name="swap_revision" value="{{.NumberOther.Revision}}">
-  <p>{{.NumberOther.Title}}{{if .NumberOther.Archived}} (archived){{end}}: {{.NumberOther.CatalogNumber}} → {{.Asset.CatalogNumber}}</p>
+  <p>ID {{.NumberTarget}} is currently occupied by {{.NumberOther.Title}}{{if .NumberOther.Archived}} (archived){{end}}: {{.NumberOther.ID}} → {{.Asset.ID}}</p>
   {{end}}
-  <div class="form-actions"><button type="submit" class="button primary">{{if .NumberOther}}Swap numbers{{else}}Change number{{end}}</button><a href="/assets/{{.Asset.ID}}/catalog-number">Cancel</a></div>
+  <label class="check"><input type="checkbox" name="acknowledge_link_changes" value="1" required> I understand that existing asset links will break or point to a different asset.</label>
+  <div class="form-actions"><button type="submit" class="button primary">{{if .NumberOther}}Swap IDs{{else}}Change ID{{end}}</button><a href="/assets/{{.Asset.ID}}/id">Cancel</a></div>
   {{else}}
-  <div class="field"><label for="catalog-number">Catalog number</label><input type="number" id="catalog-number" name="catalog_number" value="{{.NumberTarget}}" min="1" step="1" required></div>
+  <div class="field"><label for="catalog-number">Asset ID</label><input type="number" id="catalog-number" name="catalog_number" value="{{.NumberTarget}}" min="1" step="1" required></div>
   <div class="form-actions"><button type="submit" class="button primary">Preview change</button><a href="/assets/{{.Asset.ID}}">Cancel</a></div>
   {{end}}
 </form>

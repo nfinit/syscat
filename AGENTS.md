@@ -11,7 +11,10 @@
   CLI behavior, export formats, and supported inventory upgrades.
 - Keep application versions, SQLite schema versions, and per-record revisions
   independent. Preserve existing inventory through versioned migrations; retain
-  permanent entry IDs and original intake data.
+  original intake data. Asset IDs may change only through explicit, acknowledged
+  renumbering or documented numbering migrations; such changes break asset links.
+  Record successful ID moves/swaps in the same transaction as their history event;
+  preserve existing history when records are edited or renumbered again.
   Explicit photo deletion removes its original, thumbnail, and intake photo
   references; preserve all other original intake observations.
 - Record changes under `Unreleased` in `CHANGELOG.md`. At release time, create a

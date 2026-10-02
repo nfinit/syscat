@@ -13,7 +13,7 @@ it is accessible to anyone who can reach this trusted-network server.
 | `PATCH /api/assets/{id}` | Update current short description, details, or location |
 | `PATCH /api/assets/{id}/photos/{photo_id}` | Update a current photo caption or group |
 | `POST /api/assets/{id}/photos` | Attach one or more photos to an existing asset |
-| `POST /api/assets/{id}/catalog-number` | Move or swap a catalog number |
+| `POST /api/assets/{id}/id` | Move or swap an asset ID (breaks links) |
 | `GET /api/openapi.json` | Embedded OpenAPI 3.0.3 description |
 
 Read endpoints support GET and HEAD; text edits use PATCH; creation, uploads, and catalog-number changes use POST.
@@ -56,7 +56,7 @@ curl 'http://127.0.0.1:8800/api/assets?field=caption&q=unknown+chip'
 
 | Parameter | Default | Meaning |
 | --- | --- | --- |
-| `q` | Empty | Description/location/photo-caption substring search, or exact permanent ID/catalog number |
+| `q` | Empty | Description/location/photo-caption substring search, or exact asset ID |
 | `field` | `all` | Restrict `q` to `all`, `title`, `description`, `location`, `caption`, `id`, `catalog_number`, `short_description`, or `details` |
 | `page` | `1` | Page number, from 1 to 1,000,000 |
 | `page_size` | `50` | Entries per page, from 1 to 100 |
@@ -67,14 +67,14 @@ Search uses the same behavior as the HTML catalog: case-insensitive text matchin
 under SQLite's existing LIKE rules, literal `%` and `_`, and exact numeric IDs
 with or without zero padding. Caption matching searches current photos only; an
 entry appears once even if multiple captions match. Results are ordered by
-descending current catalog number.
+descending current asset ID.
 `field=title` and `field=short_description` search the complete short description,
 including text beyond the display title's truncation limit. `field=details`
 searches longer notes only. `field=description` searches the legacy combined
 projection, including the short description and details. `field=location` searches only
 location; `field=caption` searches current photo captions; `field=id` matches only
-an exact positive permanent record ID (zero padding is allowed).
-`field=catalog_number` matches only the current catalog number. Broad search
+an exact positive current asset ID (zero padding is allowed).
+`field=catalog_number` is a compatibility alias for the same ID. Broad search
 matches either numeric identity; use an explicit field to disambiguate a swap. A nonnumeric
 ID query matches nothing. Original intake and photo group names are excluded.
 An omitted field or `field=all` keeps the existing broad search. Empty `q` lists
@@ -97,7 +97,7 @@ individual records. Omitting `view` preserves the original full listing format.
 For a large catalog, begin with `GET /api/assets?view=summary&page_size=100`.
 The envelope also includes `"view": "summary"`; each asset contains only:
 
-- Permanent `id`, mutable `catalog_number`, display `label`, and `title`.
+- Current `id`, compatibility alias `catalog_number`, display `label`, and `title`.
 - `revision`, `photo_count` (current attached photos), and `archived`.
 - `url` for the web page and `api_url` for the full record and asset PATCH endpoint.
 
@@ -114,13 +114,13 @@ curl http://127.0.0.1:8800/api/assets/1
 curl http://127.0.0.1:8800/api/assets/00001
 ```
 
-Each record contains permanent numeric `id`, mutable `catalog_number`, display
+Each record contains numeric `id`, its compatibility alias `catalog_number`, display
 `label`, a short `title`, the full
 `short_description`, `details`, legacy combined `description`, `location`, ordered `photos`, `created_at`, `updated_at`,
 `revision`, and `archived`. It also provides `url` for the HTML entry and
 `api_url` for its JSON representation, `photo_upload_url` for attaching photos,
-and `catalog_number_url` for renumbering. URLs always use permanent `id`, never
-`catalog_number`.
+and `id_change_url` for renumbering (`catalog_number_url` is a legacy alias).
+URLs use the current `id`; moving/swapping an ID breaks existing asset links.
 Individual records include
 `original_intake`, the stored initial snapshot. Archived records are readable
 by ID. An invalid ID returns 400; an ID with no record returns 404.
@@ -150,7 +150,7 @@ JPEG orientation is retained. Existing images are unchanged by this upload polic
 Original intake is returned as stored, with photo `path` and `thumbnail` values
 instead of URL fields. Prefix those paths with `/` to retrieve the images from
 the same server. Its snapshot ID may be `0` because it was captured before the
-permanent ID was allocated; use the outer record's `id` to address the entry.
+sequential ID was allocated; use the outer record's `id` to address the entry.
 Older intake snapshots may omit `catalog_number`. New intake captures its initial
 catalog number; renumbering never rewrites either kind of snapshot.
 Deleting a photo removes it from current `photos` and any original-intake photo
@@ -230,7 +230,7 @@ curl http://127.0.0.1:8800/api/assets \
 ```
 
 Creation uses the same image formats, metadata stripping, thumbnails, and upload
-limits as attachments. HTTP 201 returns the full asset with its permanent ID,
+limits as attachments. HTTP 201 returns the full asset with its current ID,
 photo IDs/links, revision 1, and `original_intake`. The `Location` header points
 to the new full-record endpoint. All submitted observations and the initial
 photo collection are captured in intake, just as with browser intake. Subsequent
@@ -301,51 +301,80 @@ check which photos were attached before retrying; do not blindly repeat an uploa
 with a newer revision, which would attach duplicates. Authentication can gate
 this route through the same write policy used for PATCH.
 
-## Catalog numbers and permanent IDs
+## Asset ID changes and breaking links
 
-`id` is the permanent sequential record identity. `catalog_number` is the mutable,
-unique number shown in `label` and the browser. Existing inventory upgrades assign
-`catalog_number=id` without changing intake or revisions. New records prefer the
-same number as their sequential ID; if a future number has already been assigned,
-they use the first available number above that ID. Archived numbers remain reserved.
+`id` is the sole sequential asset identifier, used in `label` and all asset URLs.
+The deprecated `catalog_number` field mirrors it for early clients; there is no
+separate stored catalog number. New intake follows an independent sequential
+counter, skipping occupied IDs, including archived assets. Renumbering does not
+advance or rewind this counter, so high vanity IDs do not leave large gaps in
+normal intake. A skipped occupied ID is not revisited automatically if later freed.
 
-To move a record to an unused number, POST JSON to its `catalog_number_url`:
+**Renumbering is deliberately breaking.** Moving to an unused ID makes the old
+asset and API URLs return 404. Swapping IDs makes each old URL identify the other
+asset. Bookmarks, external references, and API photo-metadata URLs must be updated.
+Original image and thumbnail URLs, photo IDs, observations, and original intake
+stay with their records. Re-fetch records after a change; a remembered URL is no
+longer a permanent identity, and a revision alone cannot identify a different
+asset that later occupies the same ID.
+
+To move a record, POST to its `id_change_url` with explicit acknowledgment:
 
 ```sh
-curl -X POST http://127.0.0.1:8800/api/assets/43/catalog-number \
+curl -X POST http://127.0.0.1:8800/api/assets/43/id \
   -H 'Content-Type: application/json' \
-  -d '{"revision":6,"catalog_number":100}'
+  -d '{"revision":6,"id":100,"acknowledge_link_changes":true}'
 ```
 
-To use an occupied number, first find its occupant with
-`GET /api/assets?field=catalog_number&q=1` (check `archived=1` too if needed), then
-read both full records. Supply that occupant's permanent ID and current revision:
+For an occupied target, read both records (the target may be archived) and supply
+its current ID and revision:
 
 ```sh
-curl -X POST http://127.0.0.1:8800/api/assets/43/catalog-number \
+curl -X POST http://127.0.0.1:8800/api/assets/43/id \
   -H 'Content-Type: application/json' \
-  -d '{"revision":6,"catalog_number":1,"swap_id":1,"swap_revision":1}'
+  -d '{"revision":6,"id":1,"swap_id":1,"swap_revision":1,"acknowledge_link_changes":true}'
 ```
 
-Replace all example revisions with current values. The source takes the requested
-number; its occupant takes the source's old number. HTTP 200 returns `asset` and,
-for a swap, `swapped_asset`, each a full record. Both revisions advance on a swap;
-only the source advances on a move. Requesting the source's current number with
-no swap fields is a no-op. Permanent IDs, all URLs, image IDs/files, descriptions,
-archive status, and original intake remain with their records.
+The source takes the requested ID; the occupant takes the source's former ID.
+HTTP 200 returns `asset` and, for a swap, `swapped_asset`, with their **new** URLs.
+The `Location` header identifies the source's new API URL. Both revisions advance
+on a swap; only the source advances on a move. Requesting the current ID without
+swap fields is a no-op. The operation is transactional, including ID allocation and a persistent ID-change
+history event. Failed changes and no-ops create no event. Backend history includes
+the API/browser/internal origin and private intake keys; it is not added to normal
+responses. See [ID-change history](id-history.md) for SQL analysis examples.
 
-Occupied numbers require **both** `swap_id` and `swap_revision`; omit both for an
-unused number. Stale source/target revisions, wrong occupant IDs, or a changed
-assignment return HTTP 409 and leave both records unchanged. Archived sources
-must be restored before renumbering; archived occupants may participate in an
-explicit swap. JSON parsing, limits, and authorization match PATCH. Normal PATCH
-and creation do not accept editable catalog numbers; use this dedicated endpoint.
+`acknowledge_link_changes` must be boolean `true`. Occupied targets require both
+`swap_id` and `swap_revision`; omit both for a free target. Missing/wrong/stale
+swap expectations or changed occupancy return 409 without partial changes. A
+vacated source URL returns 404. Archived sources must be restored first; archived
+occupants may participate in an explicit swap and remain archived. The shared
+authorization policy, strict JSON parsing, 128 KiB limit, and revision checks apply.
+Normal PATCH/creation do not accept an editable ID.
 
-The browser's **Change number** control previews the affected systems before
-applying the move or swap, with the same revision checks and no JavaScript required.
-Collection and API lists now sort by descending catalog number. JSON exports add
-`catalog_number`; CSV preserves its existing columns and appends `catalog_number`,
-with `id` remaining permanent and `label` reflecting the current catalog number.
+For compatibility, `/api/assets/{id}/catalog-number` remains a route alias, and
+`catalog_number` is accepted instead of `id` in the request (never both). These
+aliases have the same breaking behavior and acknowledgment requirement.
+
+The browser's **Change ID** control previews the affected assets and the broken
+links, then requires a confirmation checkbox before saving. JavaScript is optional.
+JSON/CSV exports retain `catalog_number` as an alias equal to the current `id`.
+
+Schema 4 upgrades existing records by assigning their current displayed catalog
+numbers as IDs, then removing the catalog-number column. This can break old links
+immediately on upgrade, particularly where displayed numbers previously differed
+from record IDs. All original intake JSON, photo paths, other fields, revisions,
+and timestamps are preserved.
+
+Schema 6 separates intake allocation from SQLite's rowid high-water mark. Its
+one-time migration recovers the next number from original intake IDs/numbers and
+the earliest recorded move or swap for each record, falling back to the current
+ID for older records with neither. This can lower a counter inflated by vanity
+IDs without changing any asset, intake snapshot, or history event. Changes made
+before ID history existed cannot always be reconstructed; untraceable high IDs
+may still leave the initial counter higher. New intake snapshots record the
+allocated ID, and later allocations advance the counter transactionally.
+There are no redirects that could hide swaps by silently opening another asset.
 
 ## Description migration and early-client compatibility
 

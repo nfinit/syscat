@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+## 1.7.3 - 2026-10-02
+
+- Add schema-6 intake allocation independent of editable IDs: high vanity IDs no
+  longer push new intake forward, and occupied/archived IDs are skipped. Recover
+  the initial counter from intake data and ID history where available, preserving
+  all existing records. Allocation and intake save together; failed saves consume
+  no number. New intake snapshots include their allocated ID.
+
+- Add schema-5 ID-change history: one transactional event for each successful move
+  or swap, with timestamp, browser/API/internal origin, old/new IDs, titles,
+  revisions, and private intake keys for tracing assets through later changes.
+  Failed changes and no-ops leave no event; prior changes are not reconstructed.
+
+- Pad the ID editor and swap preview consistently with the intake form, including
+  the acknowledgment checkbox and responsive action bar.
+- **Breaking:** replace permanent record IDs plus independent catalog numbers with
+  one sequential, editable asset ID. Schema 4 retains current displayed numbers
+  as IDs, removes the separate column, and preserves observations/intake/photos.
+  Migration and later renumbering may break or reassign page and API links.
+- Add explicit link-change acknowledgment to browser/API ID moves and swaps;
+  preview the current target occupant and redirect/return the source's new URL.
+  Keep revision/occupancy checks, atomic swaps, archived target behavior, and
+  independent sequential intake allocation.
+- Expose `/api/assets/{id}/id` and `id_change_url`. Retain legacy catalog-number
+  routes, fields, search, and exports as aliases of the sole ID, with the same
+  acknowledgment requirement and breaking semantics.
+
 - Omit the location line from asset listings when no location is recorded.
 - Show location and photo group suggestions only after a nonblank character is
   entered; clearing the field closes suggestions, including keyboard selection.

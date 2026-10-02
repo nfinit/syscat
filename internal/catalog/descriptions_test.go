@@ -44,7 +44,7 @@ func TestDescriptionSplitMigrationPreservesLegacyRecords(t *testing.T) {
 	}
 	defer store.Close()
 	for i, description := range originals {
-		asset, err := store.Get(int64(i + 1))
+		asset, err := store.Get(int64(i + 101))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -54,16 +54,16 @@ func TestDescriptionSplitMigrationPreservesLegacyRecords(t *testing.T) {
 		}
 	}
 	var version int
-	if err := store.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 3 {
+	if err := store.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 6 {
 		t.Fatal(version, err)
 	}
 	// A non-text edit must preserve the exact legacy combined representation too.
-	asset, _ := store.Get(3)
+	asset, _ := store.Get(103)
 	asset.Location = "Shelf"
 	if err := store.Update(asset); err != nil {
 		t.Fatal(err)
 	}
-	after, _ := store.Get(3)
+	after, _ := store.Get(103)
 	if after.Description != originals[2] || after.Details != asset.Details || string(after.Intake) != intake {
 		t.Fatal("ordinary edit rewrote notes")
 	}
@@ -73,7 +73,7 @@ func TestDescriptionSplitMigrationPreservesLegacyRecords(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	asset, _ = store.Get(2)
+	asset, _ = store.Get(102)
 	if asset.Details != "\r\nIndented:\r\n  first line\r\n  second line\r\n" {
 		t.Fatal("migration was not idempotent", asset)
 	}
@@ -164,7 +164,7 @@ func TestSplitIntakeFormsAPIAndExports(t *testing.T) {
 	}
 	page := b.get("/assets/1")
 	expect(t, page, 200)
-	for _, text := range []string{`name="short_description"`, `name="details"`, `value="Separate title"`, `Detailed observations`, `Change number`} {
+	for _, text := range []string{`name="short_description"`, `name="details"`, `value="Separate title"`, `Detailed observations`, `Change ID`} {
 		if !strings.Contains(page.Body.String(), text) {
 			t.Fatal("split edit form missing", text)
 		}

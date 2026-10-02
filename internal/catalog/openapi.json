@@ -3,7 +3,7 @@
   "info": {
     "title": "Syscat inventory API",
     "version": "1",
-    "description": "Create and search inventory, read records and photographs, attach photos, and PATCH current short descriptions/details, locations, captions, and groups. Writes currently use trusted-network access without authentication, cookies, or CSRF tokens. Edits and attachments require the current asset revision; creation starts a new record at revision 1. URLs are root-relative. Catalog numbers can change while permanent record IDs and links stay stable."
+    "description": "Create and search inventory, read records and photographs, attach photos, and PATCH current text and photo metadata. Writes currently use trusted-network access. Asset IDs are sequential but may be explicitly moved or swapped after acknowledging that page/API URLs break or identify another asset. Schema 4 adopts current displayed catalog numbers as IDs. Original intake and image file URLs stay with their records. Revisions and current target expectations guard writes; they are not permanent record identities."
   },
   "servers": [
     {
@@ -35,12 +35,12 @@
       "get": {
         "operationId": "listAssets",
         "summary": "Search or list inventory",
-        "description": "Descending current catalog numbers. Permanent record IDs and URLs remain stable when catalog numbers change. Defaults to active records. Unknown, repeated, or invalid query parameters return 400. Original intake is omitted from listing items; fetch the individual record for it. Previous and next links are omitted when unavailable. Use view=summary for compact catalog review without description bodies, locations, timestamps, or photo metadata; follow api_url for full context. Pagination retains the selected view. Omitting view preserves the existing full response. Use field to restrict q to titles, descriptions, locations, captions, or IDs. Pagination preserves explicit field selection.",
+        "description": "Descending current asset IDs. Renumbering breaks or reassigns asset URLs; catalog_number is an alias for id. Defaults to active records. Unknown, repeated, or invalid query parameters return 400. Original intake is omitted from listing items; fetch the individual record for it. Previous and next links are omitted when unavailable. Use view=summary for compact catalog review without description bodies, locations, timestamps, or photo metadata; follow api_url for full context. Pagination retains the selected view. Omitting view preserves the existing full response. Use field to restrict q to titles, descriptions, locations, captions, or IDs. Pagination preserves explicit field selection.",
         "parameters": [
           {
             "name": "q",
             "in": "query",
-            "description": "Case-insensitive description/location/current-caption substring, or exact numeric permanent ID or catalog number (optional zero padding). Use field=id or field=catalog_number to distinguish them after renumbering.",
+            "description": "Case-insensitive description/location/current-caption substring, or exact numeric current asset ID (optional zero padding). field=catalog_number is a compatibility alias for field=id.",
             "schema": {
               "type": "string"
             }
@@ -201,7 +201,7 @@
         },
         "responses": {
           "201": {
-            "description": "Created asset including permanent inventory ID, stable photo IDs/links, original intake, and revision 1.",
+            "description": "Created asset including current asset ID, stable photo IDs and image-file URLs, original intake, and revision 1.",
             "headers": {
               "Location": {
                 "description": "Root-relative URL of the updated asset.",
@@ -751,8 +751,8 @@
     "/api/assets/{id}/catalog-number": {
       "post": {
         "operationId": "changeCatalogNumber",
-        "summary": "Move or swap an asset catalog number",
-        "description": "JSON write using the shared authorization policy. Requires current source revision. An occupied target also requires the current occupant permanent swap_id and swap_revision. Missing/wrong/stale swap expectations or a newly occupied/free target return 409 without changing either record. Archived sources must be restored first; archived targets may participate in explicit swaps and stay archived. Source and occupant revisions advance together, numbers swap atomically, and all permanent IDs, links, photos, and original intake stay unchanged. Requesting the current number with no swap fields is a no-op returning the unchanged source revision. Body limit 128 KiB. No query parameters.",
+        "summary": "Legacy route alias for changing the asset ID",
+        "description": "Changes the actual asset ID, breaking existing links. Requires acknowledge_link_changes=true and the current source revision. Supply current target swap_id and swap_revision when occupied; omit both when free. Changes are transactional. Archived sources cannot be renumbered; archived targets may swap and remain archived. Returns updated records with new URLs and Location pointing to the source API URL. Photos and original intake remain attached to their records; image file URLs stay unchanged. Old asset URLs return 404 for a move or identify the other asset after a swap. Body limit 128 KiB; no query parameters. id and catalog_number are mutually exclusive request aliases.",
         "parameters": [
           {
             "name": "id",
@@ -777,17 +777,135 @@
         },
         "responses": {
           "200": {
-            "description": "Number changed or no-op; swapped_asset present only for a swap.",
+            "description": "ID changed or no-op; source has new URLs; swapped_asset only present for a swap.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CatalogNumberResult"
                 }
               }
+            },
+            "headers": {
+              "Location": {
+                "description": "New API URL of the source asset.",
+                "schema": {
+                  "type": "string"
+                }
+              }
             }
           },
           "400": {
-            "description": "Invalid body, fields, or number.",
+            "description": "Invalid fields, invalid ID, or missing/false link-change acknowledgment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Source record not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale revision, archived source, or target assignment changed/expected occupant not supplied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON body too large.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Use application/json.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error. Transaction rolled back.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "deprecated": true
+      }
+    },
+    "/api/assets/{id}/id": {
+      "post": {
+        "operationId": "changeAssetID",
+        "summary": "Move or swap an asset ID (breaks existing links)",
+        "description": "Changes the actual asset ID, breaking existing links. Requires acknowledge_link_changes=true and the current source revision. Supply current target swap_id and swap_revision when occupied; omit both when free. Changes are transactional. Archived sources cannot be renumbered; archived targets may swap and remain archived. Returns updated records with new URLs and Location pointing to the source API URL. Photos and original intake remain attached to their records; image file URLs stay unchanged. Old asset URLs return 404 for a move or identify the other asset after a swap. Body limit 128 KiB; no query parameters. id and catalog_number are mutually exclusive request aliases.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogNumberChange"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ID changed or no-op; source has new URLs; swapped_asset only present for a swap.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogNumberResult"
+                }
+              }
+            },
+            "headers": {
+              "Location": {
+                "description": "New API URL of the source asset.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid fields, invalid ID, or missing/false link-change acknowledgment.",
             "content": {
               "application/json": {
                 "schema": {
@@ -925,18 +1043,19 @@
           "catalog_number",
           "catalog_number_url",
           "short_description",
-          "details"
+          "details",
+          "id_change_url"
         ],
         "properties": {
           "id": {
             "type": "integer",
             "format": "int64",
             "minimum": 1,
-            "description": "Permanent sequential record ID. Stable across catalog renumbering; use for URLs and edits."
+            "description": "Current sequential asset ID, used in URLs. Explicit renumbering changes it and breaks or reassigns previous links."
           },
           "label": {
             "type": "string",
-            "description": "Current catalog number padded to at least five digits, without a prefix."
+            "description": "Current asset ID padded to at least five digits, without a prefix."
           },
           "title": {
             "type": "string",
@@ -990,18 +1109,20 @@
           "photo_upload_url": {
             "type": "string",
             "format": "uri-reference",
-            "description": "Root-relative multipart POST endpoint for attaching photos to this asset."
+            "description": "Upload endpoint for the current asset ID; changes on renumbering."
           },
           "catalog_number": {
             "type": "integer",
             "format": "int64",
             "minimum": 1,
-            "description": "Mutable unique catalog number displayed in label. Initially matches the permanent id when available. Can be moved or swapped; never use it as a permanent URL identifier."
+            "description": "Deprecated compatibility alias equal to current id; no separate number is stored.",
+            "deprecated": true
           },
           "catalog_number_url": {
             "type": "string",
             "format": "uri-reference",
-            "description": "Root-relative JSON POST endpoint for changing or swapping catalog numbers."
+            "description": "Deprecated route alias for id_change_url, with identical link-breaking behavior.",
+            "deprecated": true
           },
           "short_description": {
             "type": "string",
@@ -1012,6 +1133,10 @@
           "details": {
             "type": "string",
             "description": "Longer details/research notes with whitespace and paragraph formatting preserved, at most 20,000 UTF-8 bytes. Empty string clears; omitted PATCH preserves existing notes."
+          },
+          "id_change_url": {
+            "type": "string",
+            "description": "POST endpoint for explicit ID moves/swaps; requires acknowledgment of broken links."
           }
         }
       },
@@ -1283,11 +1408,11 @@
             "type": "integer",
             "format": "int64",
             "minimum": 1,
-            "description": "Permanent sequential record ID. Stable across catalog renumbering; use for URLs and edits."
+            "description": "Current sequential asset ID, used in URLs. Explicit renumbering changes it and breaks or reassigns previous links."
           },
           "label": {
             "type": "string",
-            "description": "Current catalog number padded to at least five digits, without a prefix."
+            "description": "Current asset ID padded to at least five digits, without a prefix."
           },
           "title": {
             "type": "string"
@@ -1318,7 +1443,8 @@
             "type": "integer",
             "format": "int64",
             "minimum": 1,
-            "description": "Mutable unique catalog number displayed in label. Initially matches the permanent id when available. Can be moved or swapped; never use it as a permanent URL identifier."
+            "description": "Deprecated compatibility alias equal to current id; no separate number is stored.",
+            "deprecated": true
           }
         },
         "description": "Compact current record. Title uses the usual display-title truncation; retrieve the full description via api_url before editing."
@@ -1529,7 +1655,7 @@
         "additionalProperties": false,
         "required": [
           "revision",
-          "catalog_number"
+          "acknowledge_link_changes"
         ],
         "properties": {
           "revision": {
@@ -1541,20 +1667,57 @@
             "type": "integer",
             "format": "int64",
             "minimum": 1,
-            "description": "Requested positive catalog number. Use an exact integer; maximum 9223372036854775807."
+            "description": "Deprecated request alias for id; supply exactly one of them.",
+            "deprecated": true
           },
           "swap_id": {
             "type": "integer",
             "format": "int64",
             "minimum": 1,
-            "description": "Permanent record ID currently holding an occupied target number. Required together with swap_revision when occupied; omit both when free."
+            "description": "Current asset ID occupying the requested target. Required together with swap_revision when occupied; omit both when free."
           },
           "swap_revision": {
             "type": "integer",
             "minimum": 1,
-            "description": "Current revision of swap_id; protects the second system from stale swaps."
+            "description": "Current revision of the target occupant; protects the second asset from stale swaps."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "maximum": 9223372036854775807,
+            "description": "Requested positive asset ID. Changes page and API URLs."
+          },
+          "acknowledge_link_changes": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "description": "Required acknowledgment that changing IDs breaks or reassigns existing asset/API links."
           }
-        }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "id"
+            ],
+            "not": {
+              "required": [
+                "catalog_number"
+              ]
+            }
+          },
+          {
+            "required": [
+              "catalog_number"
+            ],
+            "not": {
+              "required": [
+                "id"
+              ]
+            }
+          }
+        ]
       },
       "CatalogNumberResult": {
         "type": "object",
@@ -1569,7 +1732,7 @@
             "$ref": "#/components/schemas/AssetDetail"
           }
         },
-        "description": "Updated source record and, for a swap, the updated second record. Both keep their permanent IDs and original intake."
+        "description": "Source record and optional swapped occupant after ID changes, with new IDs/URLs. Original intake and image files stay with their records."
       }
     }
   }

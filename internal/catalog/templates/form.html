@@ -69,8 +69,8 @@
   </div>
   <div class="form-actions">
     <button type="submit" class="button primary">{{if .Asset.ID}}Save changes{{else}}Save &amp; add another{{end}}</button>
-    {{if .Asset.ID}}<a href="/assets/{{.Asset.ID}}">Discard changes</a>{{else}}<span class="action-hint">Catalog number assigned on save.</span>{{end}}
+    {{if .Asset.ID}}<a href="/assets/{{.Asset.ID}}">Discard changes</a>{{else}}<span class="action-hint">Asset ID assigned on save.</span>{{end}}
   </div>
 </form>
-{{if and .Asset.ID (not .Asset.Archived)}}<p class="catalog-number">Catalog number <span class="mono">{{.Asset.Label}}</span> · <a href="/assets/{{.Asset.ID}}/catalog-number">Change number</a></p>{{end}}
+{{if and .Asset.ID (not .Asset.Archived)}}<p class="catalog-number">Asset ID <span class="mono">{{.Asset.Label}}</span> · <a href="/assets/{{.Asset.ID}}/id">Change ID</a></p>{{end}}
 {{end}}

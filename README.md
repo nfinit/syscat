@@ -49,24 +49,25 @@ resulting executable needs neither Go nor an installed SQLite.
 
 ## Intake
 
-- One entry per physical system. An overview photo and short description are required;
+- One entry per physical asset. An overview photo and short description are required;
   details, location, and detail photos are optional. Existing photos satisfy the overview
   requirement when editing. Older entries without photos need an overview before
   saving changes.
-- Permanent record IDs remain sequential and keep all links stable. Displayed
-  catalog numbers have no prefix: `00001`, `00002`, and so on. By default they
-  match record IDs; if that number is occupied, new intake uses the next free
-  number above it. **Change number** previews a move or a swap with the occupant.
-  Archived numbers remain reserved. Display padding grows beyond five digits.
+- Asset IDs are sequential and displayed without a prefix: `00001`, `00002`, and
+  so on. **Change ID** previews a move or a swap, identifies any occupant, and
+  requires acknowledgment that page/API links will break or point to another
+  asset. Archived IDs remain reserved. New intake follows its own sequential
+  counter and skips occupied IDs. Assigning a high vanity ID does not advance
+  that counter; renumbering does not rewind it.
 - Short description supplies the display title. Use Details for observations,
   specifications, condition, or research questions. API clients can PATCH either
   field independently. Structured classifications are deferred.
 - **Save & add another** retains location in the browser session. Sessions reset
   on server restart or after 24 hours of inactivity. Cookies are required for
   saving and remembered locations in this initial Cardcat-derived baseline.
-- The location picker opens only when explicitly chosen and stays out of the
-  sequential keyboard tab order. Typing arbitrary locations always works.
-- Search descriptions, locations, photo captions, permanent IDs, or catalog numbers, including either `42` or
+- Location and group suggestions filter after the first character; a leading
+  space shows every existing value. Typing arbitrary values always works.
+- Search descriptions, locations, photo captions, or asset IDs, including either `42` or
   `00042`. Active and archived records have separate collection pages.
 - Open an active entry to edit it, attach photographs, or mark photos for deletion
   on save. Deletion removes original files, thumbnails, and intake photo references.
@@ -134,6 +135,14 @@ data directory**, then restart with the same `--data-dir`. To restore, stop the
 server, copy the backup into an empty destination, and point `--data-dir` there.
 Back up before replacing the executable for an upgrade. Startup uses versioned
 schema migrations and rejects unsupported newer schemas.
+Schema 4 removes the separate catalog-number column and assigns each asset its
+current displayed number as its sole ID. This is a breaking upgrade: old asset
+and API links can stop working or refer to a different asset. Visible numbering,
+photo files, original intake, revisions, and other observations are preserved.
+Older binaries cannot open the upgraded schema.
+Schema 5 adds transactional ID-change history without changing existing records.
+[Backend history queries](docs/id-history.md) can trace assets through later swaps;
+previous changes are not reconstructed.
 The schema-3 description migration runs once at startup, splitting existing text
 at the first newline without rewriting original intake. Early testers can build
 the updated executable and start it with their existing `--data-dir`.
@@ -145,8 +154,8 @@ PATCH endpoints independently edit short descriptions, details, locations,
 captions, and groups using
 asset revision checks and stable photo IDs. Multipart POST creates new records
 with original intake or attaches photos to existing records, using the shared
-image privacy and thumbnail pipeline. Creation supports persistent retry keys. A dedicated catalog-number endpoint
-changes or swaps display numbers without changing permanent IDs or links.
+image privacy and thumbnail pipeline. Creation supports persistent retry keys. A dedicated ID-change endpoint
+changes or swaps asset IDs after explicit acknowledgment of broken links.
 Access currently uses the trusted network without credentials or browser sessions; write routes share a policy
 that can enforce authentication later.
 

@@ -31,7 +31,7 @@ func (a *App) numberEditor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	session := a.getSession(w, r)
-	a.render(w, 200, page{Page: "number", Title: "Change catalog number", Asset: asset, NumberTarget: asset.CatalogNumber, CSRF: session.CSRF})
+	a.render(w, 200, page{Page: "number", Title: "Change asset ID", Asset: asset, NumberTarget: asset.ID, CSRF: session.CSRF})
 }
 
 func (a *App) numberChange(w http.ResponseWriter, r *http.Request) {
@@ -40,7 +40,7 @@ func (a *App) numberChange(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	session := a.getSession(w, r)
-	p := page{Page: "number", Title: "Change catalog number", Asset: asset, NumberTarget: asset.CatalogNumber, CSRF: session.CSRF}
+	p := page{Page: "number", Title: "Change asset ID", Asset: asset, NumberTarget: asset.ID, CSRF: session.CSRF}
 	fail := func(status int, message string) { p.Error = message; a.render(w, status, p) }
 	if err := a.parsePost(w, r, session); err != nil {
 		cleanupForm(r)
@@ -63,12 +63,12 @@ func (a *App) numberChange(w http.ResponseWriter, r *http.Request) {
 		fail(409, "Entry changed. Reopen the number editor before trying again.")
 		return
 	}
-	if number == asset.CatalogNumber {
+	if number == asset.ID {
 		http.Redirect(w, r, fmt.Sprintf("/assets/%d", asset.ID), 303)
 		return
 	}
 	if r.PostForm.Get("confirm") != "1" {
-		other, err := a.store.ByCatalogNumber(number)
+		other, err := a.store.Get(number)
 		if err == nil {
 			p.NumberOther = &other
 		} else if !errors.Is(err, sql.ErrNoRows) {
@@ -77,6 +77,10 @@ func (a *App) numberChange(w http.ResponseWriter, r *http.Request) {
 		}
 		p.NumberPreview = true
 		a.render(w, 200, p)
+		return
+	}
+	if r.PostForm.Get("acknowledge_link_changes") != "1" {
+		fail(400, "Acknowledge that changing IDs breaks existing links before confirming.")
 		return
 	}
 	var swapID int64
@@ -99,7 +103,7 @@ func (a *App) numberChange(w http.ResponseWriter, r *http.Request) {
 	}
 	a.writeMu.Lock()
 	defer a.writeMu.Unlock()
-	_, _, err = a.store.Renumber(asset.ID, asset.Revision, number, swapID, swapRevision)
+	updated, _, err := a.store.renumber(asset.ID, asset.Revision, number, swapID, swapRevision, "browser")
 	if err != nil {
 		if errors.Is(err, ErrConflict) {
 			fail(409, "Number assignment or records changed. Preview the change again.")
@@ -108,5 +112,5 @@ func (a *App) numberChange(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/assets/%d?updated=1", asset.ID), 303)
+	http.Redirect(w, r, fmt.Sprintf("/assets/%d?updated=1", updated.ID), 303)
 }

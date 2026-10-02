@@ -46,6 +46,7 @@ type apiAsset struct {
 	URL              string          `json:"url"`
 	APIURL           string          `json:"api_url"`
 	PhotoUploadURL   string          `json:"photo_upload_url"`
+	IDChangeURL      string          `json:"id_change_url"`
 	CatalogNumberURL string          `json:"catalog_number_url"`
 	Intake           json.RawMessage `json:"original_intake,omitempty"`
 }
@@ -109,6 +110,7 @@ func asAPIAsset(c Asset) apiAsset {
 		Archived: c.Archived, URL: fmt.Sprintf("/assets/%d", c.ID),
 		APIURL: fmt.Sprintf("/api/assets/%d", c.ID), Intake: c.Intake,
 		PhotoUploadURL:   fmt.Sprintf("/api/assets/%d/photos", c.ID),
+		IDChangeURL:      fmt.Sprintf("/api/assets/%d/id", c.ID),
 		CatalogNumberURL: fmt.Sprintf("/api/assets/%d/catalog-number", c.ID),
 	}
 }
@@ -308,7 +310,7 @@ func (a *App) apiMethodNotAllowed(w http.ResponseWriter, r *http.Request) {
 	if r.Pattern == "/api/assets/{id}" {
 		allow = "GET, HEAD, PATCH"
 	}
-	if r.Pattern == "/api/assets/{id}/catalog-number" {
+	if r.Pattern == "/api/assets/{id}/catalog-number" || r.Pattern == "/api/assets/{id}/id" {
 		allow = "POST"
 	}
 	if r.Pattern == "/api/assets/{id}/photos" {

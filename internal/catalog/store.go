@@ -53,11 +53,7 @@ type Asset struct {
 }
 
 func (c Asset) Label() string {
-	number := c.CatalogNumber
-	if number == 0 {
-		number = c.ID
-	}
-	return fmt.Sprintf("%05d", number)
+	return fmt.Sprintf("%05d", c.ID)
 }
 func (c Asset) Title() string {
 	if c.ShortDescription == "" && c.Description == "" && c.Details == "" {
@@ -108,10 +104,10 @@ func (s *Store) initialize() error {
 	if err := tx.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
 		return err
 	}
-	if version > 3 {
-		return fmt.Errorf("database schema %d is newer than this Syscat supports (3)", version)
+	if version > 6 {
+		return fmt.Errorf("database schema %d is newer than this Syscat supports (6)", version)
 	}
-	for next := version + 1; next <= 3; next++ {
+	for next := version + 1; next <= 6; next++ {
 		script, err := migrations.ReadFile(fmt.Sprintf("migrations/%03d.sql", next))
 		if err != nil {
 			return err
@@ -126,7 +122,7 @@ func (s *Store) initialize() error {
 	return tx.Commit()
 }
 
-const columns = `id, catalog_number, description, short_description, details, location, photos, created_at, updated_at, revision, archived, intake`
+const columns = `id, id, description, short_description, details, location, photos, created_at, updated_at, revision, archived, intake`
 
 type scanner interface{ Scan(...any) error }
 
@@ -167,39 +163,43 @@ func (s *Store) Create(c Asset, key string) (int64, error) {
 	}
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	c.CreatedAt, c.UpdatedAt, c.Revision = now, now, 1
-	// Keep the initial observations even when the current fields are edited.
-	intake, err := json.Marshal(c)
-	if err != nil {
-		return 0, err
-	}
 	tx, err := s.db.Begin()
 	if err != nil {
 		return 0, err
 	}
 	defer tx.Rollback()
-	result, err := tx.Exec(`INSERT INTO assets(description, short_description, details, location, photos, intake, created_at, updated_at, submission_key) VALUES(?,?,?,?,?,?,?,?,?)`, c.Description, c.ShortDescription, c.Details, c.Location, string(photos), string(intake), now, now, key)
-	if err != nil {
+	var next, id int64
+	if err := tx.QueryRow("SELECT next_id FROM asset_id_allocator WHERE singleton=1").Scan(&next); err != nil {
 		return 0, err
 	}
-	id, err := result.LastInsertId()
-	if err != nil {
-		return 0, err
-	}
-	// Prefer the sequential ID, then the first free number above it. Reserved
-	// future catalog numbers cannot prevent new sequential records being created.
+	// Every free run starts at next or immediately after an occupied ID. This
+	// finds the first available slot without querying each occupied ID in turn.
 	err = tx.QueryRow(`SELECT candidate FROM (
- SELECT ? AS candidate UNION SELECT catalog_number+1 FROM assets
- WHERE catalog_number>=? AND catalog_number<9223372036854775807
-) WHERE NOT EXISTS (SELECT 1 FROM assets WHERE catalog_number=candidate)
-ORDER BY candidate LIMIT 1`, id, id).Scan(&c.CatalogNumber)
+		SELECT ? AS candidate
+		UNION SELECT id+1 FROM assets WHERE id>=? AND id<9223372036854775807
+	) WHERE NOT EXISTS (SELECT 1 FROM assets WHERE id=candidate)
+	ORDER BY candidate LIMIT 1`, next, next).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, errors.New("asset ID sequence exhausted")
+	}
 	if err != nil {
 		return 0, err
 	}
-	intake, err = json.Marshal(c)
+	// Keep initial observations, including their allocated ID, when fields or
+	// IDs change later. The compatibility field mirrors the sole asset ID.
+	c.ID, c.CatalogNumber = id, id
+	intake, err := json.Marshal(c)
 	if err != nil {
 		return 0, err
 	}
-	if _, err := tx.Exec(`UPDATE assets SET catalog_number=?, intake=? WHERE id=?`, c.CatalogNumber, string(intake), id); err != nil {
+	if _, err := tx.Exec(`INSERT INTO assets(id, description, short_description, details, location, photos, intake, created_at, updated_at, submission_key) VALUES(?,?,?,?,?,?,?,?,?,?)`, id, c.Description, c.ShortDescription, c.Details, c.Location, string(photos), string(intake), now, now, key); err != nil {
+		return 0, err
+	}
+	next = id
+	if id < 9223372036854775807 {
+		next++
+	}
+	if _, err := tx.Exec("UPDATE asset_id_allocator SET next_id=? WHERE singleton=1", next); err != nil {
 		return 0, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -285,15 +285,12 @@ func assetSearchWhere(query string, archived bool, field string) (string, []any)
 		case "caption":
 			where += ` AND EXISTS (SELECT 1 FROM json_each(assets.photos) AS photo WHERE json_extract(photo.value, '$.caption') LIKE ? ESCAPE '\')`
 			args = append(args, pattern)
-		case "catalog_number":
-			where += ` AND catalog_number=?`
-			args = append(args, id)
-		case "id":
+		case "catalog_number", "id":
 			where += ` AND id=?`
 			args = append(args, id)
 		default:
-			where += ` AND ((description || ' ' || location) LIKE ? ESCAPE '\' OR id=? OR catalog_number=? OR EXISTS (SELECT 1 FROM json_each(assets.photos) AS photo WHERE json_extract(photo.value, '$.caption') LIKE ? ESCAPE '\'))`
-			args = append(args, pattern, id, id, pattern)
+			where += ` AND ((description || ' ' || location) LIKE ? ESCAPE '\' OR id=? OR EXISTS (SELECT 1 FROM json_each(assets.photos) AS photo WHERE json_extract(photo.value, '$.caption') LIKE ? ESCAPE '\'))`
+			args = append(args, pattern, id, pattern)
 		}
 	}
 	return where, args
@@ -310,7 +307,7 @@ func (s *Store) listWithField(query string, archived bool, limit, offset int, fi
 		return nil, 0, err
 	}
 	args = append(args, limit, offset)
-	rows, err := s.db.Query("SELECT "+columns+" FROM assets"+where+" ORDER BY catalog_number DESC LIMIT ? OFFSET ?", args...)
+	rows, err := s.db.Query("SELECT "+columns+" FROM assets"+where+" ORDER BY id DESC LIMIT ? OFFSET ?", args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -347,7 +344,7 @@ func (s *Store) listSummariesWithField(query string, archived bool, limit, offse
 		return nil, 0, err
 	}
 	args = append(args, limit, offset)
-	rows, err := s.db.Query(`SELECT id, catalog_number, short_description, description='', revision, COALESCE(json_array_length(photos),0), archived FROM assets`+where+" ORDER BY catalog_number DESC LIMIT ? OFFSET ?", args...)
+	rows, err := s.db.Query(`SELECT id, id, short_description, description='', revision, COALESCE(json_array_length(photos),0), archived FROM assets`+where+" ORDER BY id DESC LIMIT ? OFFSET ?", args...)
 	if err != nil {
 		return nil, 0, err
 	}

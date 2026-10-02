@@ -22,7 +22,7 @@ func apiPositiveNumber(values map[string]json.RawMessage, key string) (int64, er
 }
 
 func (a *App) apiNumberChange(w http.ResponseWriter, r *http.Request) {
-	values, ok := apiPatchObject(w, r, "catalog_number", "swap_id", "swap_revision")
+	values, ok := apiPatchObject(w, r, "id", "catalog_number", "swap_id", "swap_revision", "acknowledge_link_changes")
 	if !ok {
 		return
 	}
@@ -31,7 +31,20 @@ func (a *App) apiNumberChange(w http.ResponseWriter, r *http.Request) {
 		apiError(w, 400, "invalid_request", err.Error())
 		return
 	}
-	number, err := apiPositiveNumber(values, "catalog_number")
+	var acknowledged bool
+	if json.Unmarshal(values["acknowledge_link_changes"], &acknowledged) != nil || !acknowledged {
+		apiError(w, 400, "invalid_request", "Set acknowledge_link_changes to true: renumbering changes IDs and breaks existing links.")
+		return
+	}
+	key := "id"
+	if _, legacy := values["catalog_number"]; legacy {
+		if _, mixed := values["id"]; mixed {
+			apiError(w, 400, "invalid_request", "Supply id or its legacy catalog_number alias, not both.")
+			return
+		}
+		key = "catalog_number"
+	}
+	number, err := apiPositiveNumber(values, key)
 	if err != nil {
 		apiError(w, 400, "invalid_request", err.Error())
 		return
@@ -41,7 +54,7 @@ func (a *App) apiNumberChange(w http.ResponseWriter, r *http.Request) {
 	_, hasID := values["swap_id"]
 	_, hasRevision := values["swap_revision"]
 	if hasID != hasRevision {
-		apiError(w, 400, "invalid_request", "Supply both swap_id and swap_revision for an occupied catalog number.")
+		apiError(w, 400, "invalid_request", "Supply both swap_id and swap_revision for an occupied asset ID.")
 		return
 	}
 	if hasID {
@@ -60,7 +73,7 @@ func (a *App) apiNumberChange(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	asset, swapped, err := a.store.Renumber(current.ID, revision, number, swapID, swapRevision)
+	asset, swapped, err := a.store.renumber(current.ID, revision, number, swapID, swapRevision, "api")
 	if err != nil {
 		if errors.Is(err, ErrConflict) {
 			apiError(w, 409, "conflict", "Number assignment or records changed. Read both records and supply the current occupant's swap_id and swap_revision for a swap.")
@@ -74,5 +87,6 @@ func (a *App) apiNumberChange(w http.ResponseWriter, r *http.Request) {
 		other := asAPIAsset(*swapped)
 		result.SwappedAsset = &other
 	}
+	w.Header().Set("Location", result.Asset.APIURL)
 	apiJSON(w, http.StatusOK, result)
 }

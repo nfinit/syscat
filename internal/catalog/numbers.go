@@ -6,13 +6,13 @@ import (
 	"time"
 )
 
-func (s *Store) ByCatalogNumber(number int64) (Asset, error) {
-	return scanAsset(s.db.QueryRow("SELECT "+columns+" FROM assets WHERE catalog_number=?", number))
+// Renumber moves or swaps primary keys. Negative IDs are temporary slots inside
+// this transaction; original observations and immutable image paths stay intact.
+func (s *Store) Renumber(id int64, revision int, number, swapID int64, swapRevision int) (Asset, *Asset, error) {
+	return s.renumber(id, revision, number, swapID, swapRevision, "internal")
 }
 
-// Permanent IDs and intake never change. NULL is a temporary slot inside this
-// transaction, avoiding collisions with every positive user catalog number.
-func (s *Store) Renumber(id int64, revision int, number, swapID int64, swapRevision int) (Asset, *Asset, error) {
+func (s *Store) renumber(id int64, revision int, number, swapID int64, swapRevision int, origin string) (Asset, *Asset, error) {
 	if number < 1 {
 		return Asset{}, nil, errInvalidEdit
 	}
@@ -28,13 +28,13 @@ func (s *Store) Renumber(id int64, revision int, number, swapID int64, swapRevis
 	if asset.Revision != revision || asset.Archived {
 		return Asset{}, nil, ErrConflict
 	}
-	if asset.CatalogNumber == number {
+	if asset.ID == number {
 		if swapID != 0 || swapRevision != 0 {
 			return Asset{}, nil, ErrConflict
 		}
 		return asset, nil, tx.Commit()
 	}
-	other, err := scanAsset(tx.QueryRow("SELECT "+columns+" FROM assets WHERE catalog_number=?", number))
+	other, err := scanAsset(tx.QueryRow("SELECT "+columns+" FROM assets WHERE id=?", number))
 	occupied := err == nil
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return Asset{}, nil, err
@@ -46,26 +46,44 @@ func (s *Store) Renumber(id int64, revision int, number, swapID int64, swapRevis
 	} else if swapID != 0 || swapRevision != 0 {
 		return Asset{}, nil, ErrConflict
 	}
+	var sourceKey string
+	if err := tx.QueryRow("SELECT submission_key FROM assets WHERE id=?", asset.ID).Scan(&sourceKey); err != nil {
+		return Asset{}, nil, err
+	}
+	var swappedKey, swappedTitle, swappedRevision, swappedNewRevision any
+	if occupied {
+		var key string
+		if err := tx.QueryRow("SELECT submission_key FROM assets WHERE id=?", other.ID).Scan(&key); err != nil {
+			return Asset{}, nil, err
+		}
+		swappedKey, swappedTitle = key, other.ShortDescription
+		swappedRevision, swappedNewRevision = other.Revision, other.Revision+1
+	}
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	if _, err := tx.Exec("UPDATE assets SET catalog_number=NULL WHERE id=?", asset.ID); err != nil {
+	if _, err := tx.Exec("UPDATE assets SET id=? WHERE id=?", -asset.ID, asset.ID); err != nil {
 		return Asset{}, nil, err
 	}
 	var swapped *Asset
 	if occupied {
-		if _, err := tx.Exec("UPDATE assets SET catalog_number=?,revision=revision+1,updated_at=? WHERE id=?", asset.CatalogNumber, now, other.ID); err != nil {
+		if _, err := tx.Exec("UPDATE assets SET id=?,revision=revision+1,updated_at=? WHERE id=?", asset.ID, now, other.ID); err != nil {
 			return Asset{}, nil, err
 		}
-		other.CatalogNumber = asset.CatalogNumber
+		other.ID = asset.ID
+		other.CatalogNumber = other.ID
 		other.Revision++
 		other.UpdatedAt = now
 		swapped = &other
 	}
-	if _, err := tx.Exec("UPDATE assets SET catalog_number=?,revision=revision+1,updated_at=? WHERE id=?", number, now, asset.ID); err != nil {
+	if _, err := tx.Exec("UPDATE assets SET id=?,revision=revision+1,updated_at=? WHERE id=?", number, now, -asset.ID); err != nil {
 		return Asset{}, nil, err
 	}
+	asset.ID = number
 	asset.CatalogNumber = number
 	asset.Revision++
 	asset.UpdatedAt = now
+	if _, err := tx.Exec(`INSERT INTO asset_id_changes(occurred_at,origin,old_id,new_id,source_key,source_title,source_revision,source_new_revision,swapped_key,swapped_title,swapped_revision,swapped_new_revision) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`, now, origin, id, number, sourceKey, asset.ShortDescription, revision, revision+1, swappedKey, swappedTitle, swappedRevision, swappedNewRevision); err != nil {
+		return Asset{}, nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return Asset{}, nil, err
 	}
